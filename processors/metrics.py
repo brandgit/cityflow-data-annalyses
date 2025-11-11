@@ -6,7 +6,10 @@ Implémente toutes les métriques définies dans METRIQUES_ET_CAS_USAGE.md
 from __future__ import annotations
 
 import json
+from functools import lru_cache
+from pathlib import Path
 from typing import Dict, List, Any, Optional
+
 import pandas as pd
 import numpy as np
 
@@ -92,29 +95,66 @@ def _extract_coordinates_from_bikes(df_bikes: Optional[pd.DataFrame]) -> pd.Data
     return coord_df[["compteur_id", "latitude", "longitude"]]
 
 
+REFERENCE_COORD_PATH = Path(__file__).resolve().parent / "data" / "compteur_coordinates.json"
+
+
+@lru_cache(maxsize=1)
+def _load_reference_coordinates() -> pd.DataFrame:
+    """
+    Charge la liste de coordonnées statiques construite à partir des données API.
+    """
+    if not REFERENCE_COORD_PATH.exists():
+        return pd.DataFrame(columns=["compteur_id", "latitude", "longitude"])
+    try:
+        with REFERENCE_COORD_PATH.open("r", encoding="utf-8") as f:
+            payload = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return pd.DataFrame(columns=["compteur_id", "latitude", "longitude"])
+
+    records = [
+        {"compteur_id": comp_id, "latitude": values.get("latitude"), "longitude": values.get("longitude")}
+        for comp_id, values in payload.items()
+        if values.get("latitude") is not None and values.get("longitude") is not None
+    ]
+    return pd.DataFrame.from_records(records)
+
+
 def _enrich_comptage_with_coordinates(
     df_comptage: pd.DataFrame, df_bikes: Optional[pd.DataFrame]
 ) -> pd.DataFrame:
     """
-    Complète les coordonnées GPS manquantes en se basant sur le flux bikes.
+    Complète les coordonnées GPS manquantes en se basant sur le flux bikes puis sur la référence statique.
     """
     if df_comptage.empty:
         return df_comptage
 
+    enriched = df_comptage.copy()
+
+    # Première étape : enrichissement via le flux bikes du jour
     coord_df = _extract_coordinates_from_bikes(df_bikes)
-    if coord_df.empty:
-        return df_comptage
+    if not coord_df.empty:
+        enriched = enriched.merge(coord_df, on="compteur_id", how="left", suffixes=("", "_bike"))
+        for coord in ("latitude", "longitude"):
+            bike_col = f"{coord}_bike"
+            if bike_col in enriched.columns:
+                if coord not in enriched.columns:
+                    enriched[coord] = enriched[bike_col]
+                else:
+                    enriched[coord] = enriched[coord].fillna(enriched[bike_col])
+                enriched = enriched.drop(columns=[bike_col])
 
-    enriched = df_comptage.merge(coord_df, on="compteur_id", how="left", suffixes=("", "_bike"))
-
-    for coord in ("latitude", "longitude"):
-        bike_col = f"{coord}_bike"
-        if bike_col in enriched.columns:
-            if coord not in enriched.columns:
-                enriched[coord] = enriched[bike_col]
-            else:
-                enriched[coord] = enriched[coord].fillna(enriched[bike_col])
-            enriched = enriched.drop(columns=[bike_col])
+    # Seconde étape : référentiel statique pour combler les trous restants
+    ref_df = _load_reference_coordinates()
+    if not ref_df.empty:
+        enriched = enriched.merge(ref_df, on="compteur_id", how="left", suffixes=("", "_ref"))
+        for coord in ("latitude", "longitude"):
+            ref_col = f"{coord}_ref"
+            if ref_col in enriched.columns:
+                if coord not in enriched.columns:
+                    enriched[coord] = enriched[ref_col]
+                else:
+                    enriched[coord] = enriched[coord].fillna(enriched[ref_col])
+                enriched = enriched.drop(columns=[ref_col])
 
     return enriched
 
@@ -334,8 +374,15 @@ def calculate_top_compteurs(df: pd.DataFrame, top_n: int = 200) -> pd.DataFrame:
     top["rang"] = range(1, len(top) + 1)
     
     # Enrichir avec les coordonnées GPS si disponibles
+    coord_sources = []
     if "latitude" in df.columns and "longitude" in df.columns:
-        coords = df[["compteur_id", "latitude", "longitude"]].drop_duplicates("compteur_id")
+        coord_sources.append(df[["compteur_id", "latitude", "longitude"]])
+    ref_df = _load_reference_coordinates()
+    if not ref_df.empty:
+        coord_sources.append(ref_df)
+
+    if coord_sources:
+        coords = pd.concat(coord_sources, ignore_index=True).drop_duplicates("compteur_id")
         top = top.merge(coords, on="compteur_id", how="left")
 
     base_cols = ["rang", "compteur_id", "dmja"]
