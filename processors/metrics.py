@@ -96,13 +96,13 @@ def calculate_dmja(df: pd.DataFrame) -> pd.DataFrame:
 # 2. MÉTRIQUES DE PROFILS TEMPORELS
 # ============================================================================
 
-def calculate_profil_jour_type(df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+def calculate_profil_jour_type(df: pd.DataFrame) -> pd.DataFrame:
     """
     Profil "Jour Type" : Courbe moyenne du débit horaire par jour de semaine.
-    Retourne un dictionnaire avec une DataFrame par jour.
+    Retourne un DataFrame avec colonnes: jour, heure, debit_moyen
     """
     if df.empty or "date_heure" not in df.columns or "comptage_horaire" not in df.columns:
-        return {}
+        return pd.DataFrame()
     
     frame = df.copy()
     frame["datetime"] = pd.to_datetime(frame["date_heure"], errors="coerce")
@@ -110,19 +110,15 @@ def calculate_profil_jour_type(df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
     frame["jour_semaine"] = frame["datetime"].dt.day_name()
     frame["heure"] = frame["datetime"].dt.hour
     
-    profils = {}
-    for jour in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]:
-        jour_data = frame[frame["jour_semaine"] == jour]
-        if not jour_data.empty:
-            profil = (
-                jour_data.groupby("heure")["comptage_horaire"]
-                .mean()
-                .reset_index()
-                .rename(columns={"comptage_horaire": "debit_moyen"})
-            )
-            profils[jour] = profil
+    # Agréger par jour et heure
+    profil = (
+        frame.groupby(["jour_semaine", "heure"])["comptage_horaire"]
+        .mean()
+        .reset_index()
+        .rename(columns={"comptage_horaire": "debit_moyen", "jour_semaine": "jour"})
+    )
     
-    return profils
+    return profil
 
 
 def calculate_heures_pointe(df: pd.DataFrame, seuil_pct: float = 120.0) -> pd.DataFrame:
@@ -349,12 +345,13 @@ def calculate_evolution_temporelle(df: pd.DataFrame, periode: str = "semaine") -
     return evolution
 
 
-def calculate_ratio_weekend_semaine(df: pd.DataFrame) -> Dict[str, Any]:
+def calculate_ratio_weekend_semaine(df: pd.DataFrame) -> pd.DataFrame:
     """
     Ratio Week-end / Semaine : Comparaison de l'activité cyclable.
+    Retourne un DataFrame avec une seule ligne contenant les ratios.
     """
     if df.empty or "date_heure" not in df.columns or "comptage_horaire" not in df.columns:
-        return {}
+        return pd.DataFrame()
     
     frame = df.copy()
     frame["datetime"] = pd.to_datetime(frame["date_heure"], errors="coerce")
@@ -366,12 +363,13 @@ def calculate_ratio_weekend_semaine(df: pd.DataFrame) -> Dict[str, Any]:
     
     ratio = (debit_weekend / debit_semaine) if debit_semaine > 0 else 0
     
-    return {
+    # Retourner un DataFrame avec une seule ligne
+    return pd.DataFrame([{
         "debit_weekend": int(debit_weekend),
         "debit_semaine": int(debit_semaine),
         "ratio_weekend_semaine": round(ratio, 3),
         "difference_pct": round((ratio - 1) * 100, 2)
-    }
+    }])
 
 
 # ============================================================================

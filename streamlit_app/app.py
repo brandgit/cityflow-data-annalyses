@@ -57,7 +57,7 @@ def check_api() -> bool:
 
 def get_dates() -> list:
     try:
-        r = requests.get(f"{API_URL}/metrics", timeout=10)
+        r = requests.get(f"{API_URL}/metrics/dates", timeout=10)
         return r.json().get("dates", []) if r.status_code == 200 else []
     except:
         return []

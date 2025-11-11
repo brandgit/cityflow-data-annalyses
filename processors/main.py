@@ -157,19 +157,11 @@ def _materialise_outputs(output_root: Path | None, date: str, outputs: DailyProc
         print("   📤 Sauvegarde dans la base de données...")
         
         # Préparer les métriques pour la base de données
+        # Toutes les métriques sont maintenant des DataFrames
         metrics_for_db = {}
         for metric_name, metric_data in outputs.metrics_cityflow.items():
-            if isinstance(metric_data, pd.DataFrame):
-                if not metric_data.empty:
-                    metrics_for_db[metric_name] = json.loads(metric_data.to_json(orient="records"))
-            elif isinstance(metric_data, dict):
-                if all(isinstance(v, pd.DataFrame) for v in metric_data.values()):
-                    metrics_for_db[metric_name] = {
-                        k: json.loads(df.to_json(orient="records")) if not df.empty else []
-                        for k, df in metric_data.items()
-                    }
-                else:
-                    metrics_for_db[metric_name] = metric_data
+            if isinstance(metric_data, pd.DataFrame) and not metric_data.empty:
+                metrics_for_db[metric_name] = json.loads(metric_data.to_json(orient="records"))
         
         # Sauvegarder les métriques
         if metrics_for_db:
