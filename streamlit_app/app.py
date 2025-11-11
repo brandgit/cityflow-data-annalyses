@@ -1058,32 +1058,149 @@ with tab4:
             
             if isinstance(corr_data, list) and len(corr_data) > 0:
                 df_corr = safe_dataframe(corr_data)
-                
-                # Afficher selon les colonnes disponibles
-                if "correlation" in df_corr.columns:
-                    # Graphique de corrélation
-                    fig = go.Figure()
-                    fig.add_trace(go.Bar(
-                        x=df_corr.iloc[:, 0],
-                        y=df_corr["correlation"],
-                        marker=dict(
-                            color=df_corr["correlation"],
-                            colorscale="RdBu",
-                            cmin=-1,
-                            cmax=1,
-                            colorbar=dict(title="Corrélation")
+
+                if corr_name == "chantiers_velo" and not df_corr.empty:
+                    st.caption("Impact des chantiers sur la fréquentation vélo (corrélation quotidienne).")
+
+                    corr_value = df_corr.get("correlation_chantiers_velo")
+                    if corr_value is not None and not corr_value.empty:
+                        st.metric("Coefficient de corrélation", f"{corr_value.iloc[0]:.3f}")
+
+                    if {"date", "total_velos", "nb_chantiers_actifs"}.issubset(df_corr.columns):
+                        df_corr["date"] = pd.to_datetime(df_corr["date"])
+                        fig = make_subplots(specs=[[{"secondary_y": True}]])
+                        fig.add_trace(
+                            go.Scatter(
+                                x=df_corr["date"],
+                                y=df_corr["total_velos"],
+                                mode="lines+markers",
+                                name="Total vélos",
+                                line=dict(color="#1f77b4"),
+                            ),
+                            secondary_y=False,
                         )
-                    ))
+                        fig.add_trace(
+                            go.Bar(
+                                x=df_corr["date"],
+                                y=df_corr["nb_chantiers_actifs"],
+                                name="Chantiers actifs",
+                                marker_color="#ff7f0e",
+                                opacity=0.6,
+                            ),
+                            secondary_y=True,
+                        )
+                        fig.update_layout(
+                            title="Trafic vélo vs Chantiers actifs",
+                            height=420,
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                        )
+                        fig.update_xaxes(title_text="Date")
+                        fig.update_yaxes(title_text="Total vélos", secondary_y=False)
+                        fig.update_yaxes(title_text="Chantiers actifs", secondary_y=True)
+                        st.plotly_chart(fig, use_container_width=True)
+
+                elif corr_name == "meteo_velo" and not df_corr.empty:
+                    st.caption("Corrélation météo ↔ trafic vélo.")
+
+                    corr_temp = df_corr.get("correlation_temperature")
+                    corr_precip = df_corr.get("correlation_precipitation")
+                    cols = st.columns(2)
+                    if corr_temp is not None and not corr_temp.empty:
+                        cols[0].metric("Corrélation température", f"{corr_temp.iloc[0]:.3f}")
+                    if corr_precip is not None and not corr_precip.empty:
+                        cols[1].metric("Corrélation précipitations", f"{corr_precip.iloc[0]:.3f}")
+
+                    if {"date", "total_velos", "temperature_max", "precipitation"}.issubset(df_corr.columns):
+                        df_corr["date"] = pd.to_datetime(df_corr["date"])
+                        fig = make_subplots(specs=[[{"secondary_y": True}]])
+                        fig.add_trace(
+                            go.Scatter(
+                                x=df_corr["date"],
+                                y=df_corr["total_velos"],
+                                mode="lines+markers",
+                                name="Total vélos",
+                                line=dict(color="#1f77b4"),
+                            ),
+                            secondary_y=False,
+                        )
+                        fig.add_trace(
+                            go.Scatter(
+                                x=df_corr["date"],
+                                y=df_corr["temperature_max"],
+                                mode="lines",
+                                name="Température max (°C)",
+                                line=dict(color="#d62728", dash="dash"),
+                            ),
+                            secondary_y=True,
+                        )
+                        fig.update_layout(
+                            title="Trafic vélo vs Température",
+                            height=420,
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                        )
+                        fig.update_xaxes(title_text="Date")
+                        fig.update_yaxes(title_text="Total vélos", secondary_y=False)
+                        fig.update_yaxes(title_text="Température (°C)", secondary_y=True)
+                        st.plotly_chart(fig, use_container_width=True)
+
+                        fig_precip = go.Figure()
+                        fig_precip.add_trace(
+                            go.Bar(
+                                x=df_corr["date"],
+                                y=df_corr["precipitation"],
+                                name="Précipitations (mm)",
+                                marker_color="#17becf",
+                            )
+                        )
+                        fig_precip.update_layout(
+                            title="Précipitations quotidiennes",
+                            height=320,
+                            yaxis_title="mm",
+                        )
+                        st.plotly_chart(fig_precip, use_container_width=True)
+
+                elif corr_name == "qualite_validations" and not df_corr.empty:
+                    st.caption("Évolution de la qualité de service vs validations.")
+
+                    if {"periode", "score_moyen_qualite"}.issubset(df_corr.columns):
+                        fig = px.line(
+                            df_corr,
+                            x="periode",
+                            y="score_moyen_qualite",
+                            markers=True,
+                            title="Score moyen de qualité de service",
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.info("Pas assez d'informations pour générer un visuel pertinent.")
+
+                elif "correlation" in df_corr.columns:
+                    fig = go.Figure()
+                    fig.add_trace(
+                        go.Bar(
+                            x=df_corr.iloc[:, 0],
+                            y=df_corr["correlation"],
+                            marker=dict(
+                                color=df_corr["correlation"],
+                                colorscale="RdBu",
+                                cmin=-1,
+                                cmax=1,
+                                colorbar=dict(title="Corrélation"),
+                            ),
+                        )
+                    )
                     fig.update_layout(
                         title=f"Valeurs de Corrélation - {corr_name}",
                         xaxis_title=df_corr.columns[0],
                         yaxis_title="Coefficient de Corrélation",
                         yaxis=dict(range=[-1, 1]),
-                        height=400
+                        height=400,
                     )
                     st.plotly_chart(fig, use_container_width=True)
-                
-                # Afficher les données
+
+                else:
+                    st.info("Pas de structure exploitable pour un graphique. Données brutes affichées ci-dessous.")
+
                 with st.expander("📊 Voir les données brutes"):
                     st.dataframe(df_corr, use_container_width=True)
             else:
