@@ -24,9 +24,45 @@ class Config:
         # Configuration MongoDB (local)
         self.mongodb_url = os.getenv("MONGODB_URL", "mongodb://localhost:27017/")
         self.mongodb_database = os.getenv("MONGODB_DATABASE", "cityflow-db")
-        self.metrics_table = os.getenv("METRICS_TABLE", "cityflow-metrics")
+        
+        # Tables de métriques (DynamoDB en AWS, collections MongoDB en local)
+        self.metrics_flux_table = os.getenv("METRICS_FLUX_TABLE", "cityflow-metrics-flux")
+        self.metrics_performance_table = os.getenv("METRICS_PERFORMANCE_TABLE", "cityflow-metrics-performance")
+        self.metrics_analyse_table = os.getenv("METRICS_ANALYSE_TABLE", "cityflow-metrics-analyse")
+        self.metrics_infrastructure_table = os.getenv("METRICS_INFRASTRUCTURE_TABLE", "cityflow-metrics-infrastructure")
+        
+        # Tables corrélations et rapports
         self.correlations_table = os.getenv("CORRELATIONS_TABLE", "cityflow-daily-correlations")
         self.reports_table = os.getenv("REPORTS_TABLE", "cityflow-daily-reports")
+        
+        # Mapping métriques → tables
+        self.metrics_routing = {
+            # Flux
+            "debit_horaire": self.metrics_flux_table,
+            "debit_journalier": self.metrics_flux_table,
+            "dmja": self.metrics_flux_table,
+            "evolution_hebdomadaire": self.metrics_flux_table,
+            "ratio_weekend_semaine": self.metrics_flux_table,
+            
+            # Performance
+            "taux_disponibilite": self.metrics_performance_table,
+            "top_compteurs": self.metrics_performance_table,
+            "compteurs_faible_activite": self.metrics_performance_table,
+            "compteurs_defaillants": self.metrics_performance_table,
+            "heures_pointe": self.metrics_performance_table,
+            "profil_jour_type": self.metrics_performance_table,
+            
+            # Analyse
+            "anomalies": self.metrics_analyse_table,
+            "congestion_cyclable": self.metrics_analyse_table,
+            "corridors_cyclables": self.metrics_analyse_table,
+            "densite_par_zone": self.metrics_analyse_table,
+            
+            # Infrastructure
+            "chantiers_actifs": self.metrics_infrastructure_table,
+            "score_criticite_chantiers": self.metrics_infrastructure_table,
+            "qualite_service": self.metrics_infrastructure_table,
+        }
         
         # Configuration S3
         self.use_s3 = os.getenv("USE_S3", "false").lower() == "true"

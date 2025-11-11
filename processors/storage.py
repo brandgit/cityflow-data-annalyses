@@ -148,8 +148,11 @@ class OutputWriter:
         success_count = 0
         total_count = len(metrics)
         
-        # Sauvegarder chaque métrique individuellement
+        # Sauvegarder chaque métrique individuellement dans la table appropriée
         for metric_name, metric_data in metrics.items():
+            # Déterminer la table de destination selon le type de métrique
+            target_table = self.config.metrics_routing.get(metric_name, self.config.metrics_flux_table)
+            
             data = {
                 "date": date,
                 "metric_name": metric_name,
@@ -159,12 +162,12 @@ class OutputWriter:
             
             if self.config.is_local:
                 success = self._write_to_mongodb(
-                    collection=self.config.metrics_table,
+                    collection=target_table,
                     data=data,
                     query_filter={"date": date, "metric_name": metric_name}
                 )
             else:
-                # Pour DynamoDB, on utilise date+metric_name comme clé composite
+                # Pour DynamoDB, router vers la bonne table selon le type de métrique
                 item = {
                     "date": date,
                     "metric_name": metric_name,
@@ -172,7 +175,7 @@ class OutputWriter:
                     "timestamp": datetime.utcnow().isoformat()
                 }
                 success = self._write_to_dynamodb(
-                    table_name=self.config.metrics_table,
+                    table_name=target_table,
                     item=item
                 )
             
