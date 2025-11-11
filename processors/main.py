@@ -416,12 +416,13 @@ def process_day(raw_root: Path, date: str, *, output_root: Path | None = None, w
         correlations=correlations
     )
 
+    # Toujours sauvegarder (agrégats en local si output_root fourni, métriques en DB si writer fourni)
+    print(f"\n💾 Sauvegarde des résultats...")
+    _materialise_outputs(output_root, date, output, writer=writer)
     if output_root is not None:
-        print(f"\n💾 Sauvegarde des résultats...")
-        _materialise_outputs(output_root, date, output, writer=writer)
         print("   ✓ Agrégats sauvegardés localement")
-        if writer is not None:
-            print("   ✓ Métriques, corrélations et rapports sauvegardés dans la base de données")
+    if writer is not None:
+        print("   ✓ Métriques, corrélations et rapports sauvegardés dans la base de données")
 
     return output
 
