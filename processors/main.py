@@ -425,7 +425,7 @@ def process_day(raw_root: Path, date: str, *, output_root: Path | None = None, w
     return output
 
 
-def _print_summary(output: DailyProcessingOutput, date: str, output_root: Path) -> None:
+def _print_summary(output: DailyProcessingOutput, date: str, output_root: Path | None) -> None:
     print(f"\n{'='*80}")
     print(f"📊 RÉSUMÉ DU TRAITEMENT - {date}")
     print(f"{'='*80}")
@@ -457,8 +457,9 @@ def _print_summary(output: DailyProcessingOutput, date: str, output_root: Path) 
     else:
         print("   • Aucune corrélation calculée")
     
-    print(f"\n📂 Fichiers locaux générés:")
-    print(f"   • Agrégats uniquement : {output_root / date / 'metrics'}")
+    if output_root:
+        print(f"\n📂 Fichiers locaux générés:")
+        print(f"   • Agrégats uniquement : {output_root / date / 'metrics'}")
     
     print(f"\n💾 Données en base de données:")
     print(f"   • Métriques CityFlow : collection 'cityflow-metrics'")
@@ -526,7 +527,9 @@ if __name__ == "__main__":
     
     print("\n📅 Détermination de la date de traitement...")
     today = pd.Timestamp.utcnow().strftime("%Y-%m-%d")
-    output_root = Path("output")
+    
+    # En mode AWS, ne pas sauvegarder localement (manque d'espace disque)
+    output_root = Path("output") if cfg.is_local else None
 
     target_date = _resolve_processing_date(raw_root, today)
     if target_date != today:
