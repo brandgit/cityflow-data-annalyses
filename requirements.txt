@@ -1,0 +1,33 @@
+# Bibliothèques pour le traitement de données
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Bibliothèques pour l'analyse et visualisation
+matplotlib>=3.7.0
+seaborn>=0.12.0
+plotly>=5.14.0
+
+# Bibliothèques pour Jupyter
+jupyter>=1.0.0
+ipykernel>=6.25.0
+notebook>=6.5.0
+
+# Bibliothèques AWS SDK
+boto3>=1.28.0
+
+# Bibliothèques pour les requêtes HTTP (API)
+requests>=2.31.0
+
+# Bibliothèques pour le traitement de fichiers CSV
+openpyxl>=3.1.0
+
+# Bibliothèques pour la géolocalisation (si nécessaire)
+geopandas>=0.13.0
+shapely>=2.0.0
+
+# Bibliothèques pour MongoDB (environnement local)
+pymongo>=4.5.0
+
+# Bibliothèques pour les variables d'environnement
+python-dotenv>=1.0.0
+

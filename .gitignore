@@ -1,0 +1,58 @@
+# Environnement virtuel Python
+venv/
+env/
+ENV/
+.venv
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb_checkpoints/
+
+# Fichiers Python compilés
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyCharm
+.idea/
+
+# VS Code
+.vscode/
+
+# Fichiers de configuration locaux
+.aws/
+
+# Fichiers de données volumineux (optionnel)
+data/*.csv
+!data/.gitkeep
+
+# Fichiers temporaires
+*.tmp
+*.log
+.DS_Store
+
+# Documentation markdown
+*.md
+
+# Données brutes et résultats
+bucket-cityflow-paris-s3-raw/
+output/
