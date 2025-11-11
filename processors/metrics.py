@@ -84,13 +84,27 @@ def calculate_debit_journalier(df: pd.DataFrame, top_n_compteurs: int = 50, last
 def calculate_dmja(df: pd.DataFrame) -> pd.DataFrame:
     """
     Débit Moyen Journalier Annuel (DMJA) : Moyenne des débits journaliers.
+    Calculé sur l'ensemble des compteurs pour obtenir une vue complète.
     """
-    dj = calculate_debit_journalier(df)
-    if dj.empty:
+    if df.empty or "compteur_id" not in df.columns or "comptage_horaire" not in df.columns:
         return pd.DataFrame()
     
+    frame = df.copy()
+    if "date_heure" not in frame.columns:
+        return pd.DataFrame()
+    
+    frame["date"] = pd.to_datetime(frame["date_heure"], errors="coerce").dt.date
+    frame = frame.dropna(subset=["date"])
+    
+    daily = (
+        frame.groupby(["compteur_id", "date"])["comptage_horaire"]
+        .sum()
+        .reset_index()
+        .rename(columns={"comptage_horaire": "debit_journalier"})
+    )
+    
     result = (
-        dj.groupby("compteur_id")["debit_journalier"]
+        daily.groupby("compteur_id")["debit_journalier"]
         .mean()
         .reset_index()
         .rename(columns={"debit_journalier": "dmja"})
@@ -191,7 +205,7 @@ def calculate_taux_disponibilite(df: pd.DataFrame, periode_jours: int = 30) -> p
     return enregistrements_reels
 
 
-def calculate_top_compteurs(df: pd.DataFrame, top_n: int = 10) -> pd.DataFrame:
+def calculate_top_compteurs(df: pd.DataFrame, top_n: int = 200) -> pd.DataFrame:
     """
     Compteurs les Plus Actifs : Top N des compteurs avec le plus grand débit journalier moyen.
     """
@@ -650,7 +664,7 @@ def calculate_all_metrics(
     
     # 3. Performance compteurs
     metrics["taux_disponibilite"] = calculate_taux_disponibilite(df_comptage_velo)
-    metrics["top_compteurs"] = calculate_top_compteurs(df_comptage_velo, top_n=10)
+    metrics["top_compteurs"] = calculate_top_compteurs(df_comptage_velo, top_n=200)
     metrics["compteurs_faible_activite"] = calculate_compteurs_faible_activite(df_comptage_velo)
     metrics["compteurs_defaillants"] = detect_compteurs_defaillants(df_comptage_velo)
     
