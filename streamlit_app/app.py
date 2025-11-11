@@ -1,12 +1,17 @@
 """
-Application Streamlit principale pour CityFlow Analytics Dashboard.
+CityFlow Analytics Dashboard - Version Professionnelle
+Application Streamlit avec visualisations interactives
 """
 
 import streamlit as st
 from datetime import datetime, timedelta
 import requests
-from typing import Optional
+from typing import Optional, Dict, List
 import os
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 # Configuration de la page
 st.set_page_config(
@@ -23,23 +28,41 @@ API_URL = os.getenv("API_URL", "http://localhost:8000")
 st.markdown("""
 <style>
     .main-header {
-        font-size: 3rem;
+        font-size: 3.5rem;
         font-weight: bold;
-        color: #1f77b4;
+        background: linear-gradient(90deg, #1f77b4 0%, #ff7f0e 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+    .sub-header {
+        font-size: 1.2rem;
+        color: #666;
         text-align: center;
         margin-bottom: 2rem;
     }
     .metric-card {
-        background-color: #f0f2f6;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        margin: 0.5rem 0;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 1.5rem;
+        border-radius: 1rem;
+        color: white;
+        text-align: center;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 2rem;
+    .stAlert {
+        border-radius: 0.5rem;
+    }
+    div[data-testid="stMetricValue"] {
+        font-size: 2rem;
+        font-weight: bold;
     }
 </style>
 """, unsafe_allow_html=True)
+
+# ============================================================================
+# FONCTIONS UTILITAIRES
+# ============================================================================
 
 def check_api_health() -> bool:
     """Vérifie que l'API est accessible."""
@@ -67,236 +90,422 @@ def fetch_metrics(date: str) -> Optional[dict]:
             return response.json()
         return None
     except Exception as e:
-        st.error(f"Erreur lors de la récupération des métriques : {e}")
+        st.error(f"Erreur : {e}")
+        return None
+
+def fetch_metric_by_name(date: str, metric_name: str) -> Optional[dict]:
+    """Récupère une métrique spécifique."""
+    try:
+        response = requests.get(f"{API_URL}/metrics/{date}/{metric_name}", timeout=30)
+        if response.status_code == 200:
+            return response.json()
+        return None
+    except:
         return None
 
 def fetch_correlations(date: str) -> Optional[dict]:
-    """Récupère les corrélations pour une date donnée."""
+    """Récupère les corrélations."""
     try:
         response = requests.get(f"{API_URL}/correlations/{date}", timeout=30)
         if response.status_code == 200:
             return response.json()
         return None
-    except Exception as e:
-        st.error(f"Erreur lors de la récupération des corrélations : {e}")
-        return None
-
-def fetch_reports(date: str) -> Optional[dict]:
-    """Récupère les rapports pour une date donnée."""
-    try:
-        response = requests.get(f"{API_URL}/reports/{date}", timeout=30)
-        if response.status_code == 200:
-            return response.json()
-        return None
-    except Exception as e:
-        st.error(f"Erreur lors de la récupération des rapports : {e}")
+    except:
         return None
 
 # ============================================================================
-# Interface principale
+# SIDEBAR
 # ============================================================================
 
-st.markdown('<h1 class="main-header">🚴 CityFlow Analytics Dashboard</h1>', unsafe_allow_html=True)
-
-# Vérification de l'API
 with st.sidebar:
+    st.image("https://img.icons8.com/color/96/000000/bicycle.png", width=80)
     st.title("⚙️ Configuration")
     
     # Status de l'API
     st.subheader("📡 État de l'API")
     if check_api_health():
         st.success("✅ API connectée")
-        st.text(f"URL: {API_URL}")
     else:
         st.error("❌ API non accessible")
-        st.text(f"URL: {API_URL}")
-        st.info("💡 Assurez-vous que l'API est lancée :\n```bash\npython -m api.main\n```")
         st.stop()
     
     st.divider()
     
     # Sélection de la date
     st.subheader("📅 Sélection de la date")
-    
-    # Récupérer les dates disponibles
-    with st.spinner("Chargement des dates..."):
+    with st.spinner("Chargement..."):
         available_dates = fetch_available_dates()
     
     if not available_dates:
-        st.warning("Aucune date disponible")
-        selected_date = st.date_input(
-            "Date",
-            value=datetime.now().date(),
-            help="Aucune donnée trouvée pour cette date"
-        )
+        selected_date = st.date_input("Date", value=datetime.now().date())
         selected_date = selected_date.strftime("%Y-%m-%d")
     else:
-        # Trier les dates et prendre la plus récente par défaut
         available_dates.sort(reverse=True)
-        selected_date = st.selectbox(
-            "Date disponible",
-            options=available_dates,
-            help=f"{len(available_dates)} date(s) disponible(s)"
-        )
+        selected_date = st.selectbox("Date", options=available_dates)
     
     st.divider()
-    
-    # Informations
-    st.subheader("ℹ️ Informations")
-    st.info("""
-    **Navigation :**
-    - 📊 Métriques : 18 indicateurs
-    - 🔗 Corrélations : Analyses croisées
-    - 📈 Rapports : Synthèses quotidiennes
-    """)
+    st.caption("🚴 CityFlow Analytics v2.0")
 
 # ============================================================================
-# Onglets principaux
+# EN-TÊTE
 # ============================================================================
 
-tab1, tab2, tab3 = st.tabs(["📊 Métriques", "🔗 Corrélations", "📈 Rapports"])
+st.markdown('<h1 class="main-header">🚴 CityFlow Analytics Dashboard</h1>', unsafe_allow_html=True)
+st.markdown(f'<p class="sub-header">📅 Analyse du {selected_date}</p>', unsafe_allow_html=True)
 
 # ============================================================================
-# ONGLET 1 : MÉTRIQUES
+# CHARGEMENT DES DONNÉES
+# ============================================================================
+
+with st.spinner("🔄 Chargement des données..."):
+    metrics_data = fetch_metrics(selected_date)
+
+if not metrics_data or metrics_data.get("metrics_count", 0) == 0:
+    st.warning("⚠️ Aucune donnée disponible pour cette date")
+    st.stop()
+
+# ============================================================================
+# KPIs PRINCIPAUX
+# ============================================================================
+
+st.header("📊 Indicateurs Clés")
+
+# Récupérer les métriques spécifiques
+top_compteurs = fetch_metric_by_name(selected_date, "top_compteurs")
+anomalies = fetch_metric_by_name(selected_date, "anomalies")
+congestion = fetch_metric_by_name(selected_date, "congestion_cyclable")
+
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    metrics_count = metrics_data.get("metrics_count", 0)
+    st.metric(
+        label="📈 Métriques Calculées",
+        value=f"{metrics_count}/18",
+        delta="Complet" if metrics_count == 18 else f"{18-metrics_count} manquantes"
+    )
+
+with col2:
+    if top_compteurs and top_compteurs.get("data"):
+        df_top = pd.DataFrame(top_compteurs["data"])
+        if not df_top.empty and "debit_moyen" in df_top.columns:
+            total_debit = int(df_top["debit_moyen"].sum())
+            st.metric(
+                label="🚴 Débit Total Moyen",
+                value=f"{total_debit:,}",
+                delta="vélos/jour"
+            )
+        else:
+            st.metric(label="🚴 Débit Total", value="N/A")
+    else:
+        st.metric(label="🚴 Débit Total", value="N/A")
+
+with col3:
+    if anomalies and anomalies.get("data"):
+        nb_anomalies = len(anomalies["data"])
+        st.metric(
+            label="🚨 Anomalies Détectées",
+            value=nb_anomalies,
+            delta="alertes" if nb_anomalies > 0 else "Aucune"
+        )
+    else:
+        st.metric(label="🚨 Anomalies", value="0")
+
+with col4:
+    if congestion and congestion.get("data"):
+        nb_congestions = len(congestion["data"])
+        st.metric(
+            label="🔴 Congestions",
+            value=nb_congestions,
+            delta="zones"
+        )
+    else:
+        st.metric(label="🔴 Congestions", value="0")
+
+st.divider()
+
+# ============================================================================
+# ONGLETS PRINCIPAUX
+# ============================================================================
+
+tab1, tab2, tab3, tab4 = st.tabs(["📊 Vue d'ensemble", "🚴 Flux Vélos", "🚨 Alertes", "🔗 Corrélations"])
+
+# ============================================================================
+# TAB 1: VUE D'ENSEMBLE
 # ============================================================================
 
 with tab1:
-    st.header(f"📊 Métriques CityFlow - {selected_date}")
+    st.header("📊 Vue d'Ensemble")
     
-    with st.spinner("Chargement des métriques..."):
-        metrics_data = fetch_metrics(selected_date)
+    col1, col2 = st.columns(2)
     
-    if not metrics_data:
-        st.warning("Aucune métrique disponible pour cette date.")
+    with col1:
+        st.subheader("🏆 Top 10 Compteurs")
+        if top_compteurs and top_compteurs.get("data"):
+            df_top = pd.DataFrame(top_compteurs["data"])
+            if not df_top.empty:
+                # Graphique en barres
+                fig = px.bar(
+                    df_top.head(10),
+                    x="debit_moyen",
+                    y="compteur_id",
+                    orientation="h",
+                    title="Top 10 Compteurs par Débit Moyen",
+                    labels={"debit_moyen": "Débit Moyen", "compteur_id": "Compteur"},
+                    color="debit_moyen",
+                    color_continuous_scale="Blues"
+                )
+                fig.update_layout(height=500, showlegend=False)
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("Aucune donnée disponible")
+        else:
+            st.info("Données non disponibles")
+    
+    with col2:
+        st.subheader("⏰ Heures de Pointe")
+        heures_pointe = fetch_metric_by_name(selected_date, "heures_pointe")
+        if heures_pointe and heures_pointe.get("data"):
+            df_heures = pd.DataFrame(heures_pointe["data"])
+            if not df_heures.empty and "heure" in df_heures.columns:
+                # Graphique en ligne
+                fig = px.line(
+                    df_heures,
+                    x="heure",
+                    y="debit_moyen",
+                    title="Distribution Horaire du Trafic",
+                    labels={"heure": "Heure", "debit_moyen": "Débit Moyen"},
+                    markers=True
+                )
+                fig.update_layout(height=500)
+                fig.update_traces(line_color="#1f77b4", line_width=3)
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("Aucune donnée disponible")
+        else:
+            st.info("Données non disponibles")
+    
+    st.divider()
+    
+    # Répartition géographique
+    st.subheader("🗺️ Densité par Zone")
+    densite = fetch_metric_by_name(selected_date, "densite_par_zone")
+    if densite and densite.get("data"):
+        df_densite = pd.DataFrame(densite["data"])
+        if not df_densite.empty:
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Graphique en camembert
+                fig = px.pie(
+                    df_densite,
+                    values="debit_total",
+                    names="arrondissement",
+                    title="Répartition du Trafic par Arrondissement",
+                    hole=0.4
+                )
+                fig.update_traces(textposition='inside', textinfo='percent+label')
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with col2:
+                # Graphique en barres horizontales
+                fig = px.bar(
+                    df_densite.sort_values("debit_total", ascending=True),
+                    x="debit_total",
+                    y="arrondissement",
+                    orientation="h",
+                    title="Débit Total par Arrondissement",
+                    labels={"debit_total": "Débit Total", "arrondissement": "Arrondissement"},
+                    color="debit_total",
+                    color_continuous_scale="Viridis"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Aucune donnée géographique disponible")
     else:
-        metrics_count = metrics_data.get("metrics_count", 0)
-        st.success(f"✅ {metrics_count} métriques disponibles")
-        
-        # Catégorisation des métriques
-        flux_metrics = ["debit_horaire", "debit_journalier", "dmja"]
-        temporal_metrics = ["profil_jour_type", "heures_pointe", "evolution_hebdomadaire", "ratio_weekend_semaine"]
-        performance_metrics = ["taux_disponibilite", "top_compteurs", "compteurs_faible_activite", "compteurs_defaillants"]
-        geo_metrics = ["densite_par_zone", "corridors_cyclables"]
-        alert_metrics = ["congestion_cyclable", "anomalies"]
-        chantier_metrics = ["chantiers_actifs", "score_criticite_chantiers"]
-        qualite_metrics = ["qualite_service"]
-        
-        # Affichage par catégorie
-        categories = {
-            "🚦 Métriques de Flux": flux_metrics,
-            "⏰ Profils Temporels": temporal_metrics,
-            "📈 Performance Compteurs": performance_metrics,
-            "🗺️ Géographie": geo_metrics,
-            "🚨 Alertes": alert_metrics,
-            "🚧 Chantiers": chantier_metrics,
-            "✨ Qualité de Service": qualite_metrics
-        }
-        
-        for category_name, metric_names in categories.items():
-            with st.expander(category_name, expanded=False):
-                for metric_data in metrics_data.get("metrics", []):
-                    metric_name = metric_data.get("metric_name")
-                    if metric_name in metric_names:
-                        st.subheader(f"📌 {metric_name}")
-                        
-                        # Afficher les données
-                        data = metric_data.get("data", [])
-                        if isinstance(data, list) and len(data) > 0:
-                            import pandas as pd
-                            df = pd.DataFrame(data)
-                            
-                            col1, col2 = st.columns([1, 3])
-                            with col1:
-                                st.metric("Nombre de lignes", len(df))
-                            with col2:
-                                st.dataframe(df.head(10), use_container_width=True)
-                            
-                            if st.button(f"Voir toutes les données - {metric_name}", key=f"btn_{metric_name}"):
-                                st.dataframe(df, use_container_width=True)
-                        else:
-                            st.info(f"Données: {data}")
-                        
-                        st.divider()
+        st.info("Données non disponibles")
 
 # ============================================================================
-# ONGLET 2 : CORRÉLATIONS
+# TAB 2: FLUX VÉLOS
 # ============================================================================
 
 with tab2:
-    st.header(f"🔗 Corrélations - {selected_date}")
+    st.header("🚴 Analyse des Flux Vélos")
+    
+    # Débit journalier
+    st.subheader("📈 Débit Journalier")
+    debit_j = fetch_metric_by_name(selected_date, "debit_journalier")
+    if debit_j and debit_j.get("data"):
+        df_debit = pd.DataFrame(debit_j["data"])
+        if not df_debit.empty and len(df_debit) > 0:
+            # Heatmap par compteur et date
+            if "date" in df_debit.columns and "compteur_id" in df_debit.columns:
+                # Prendre les top 20 compteurs
+                top20 = df_debit.groupby("compteur_id")["debit_journalier"].sum().nlargest(20).index
+                df_top20 = df_debit[df_debit["compteur_id"].isin(top20)]
+                
+                pivot = df_top20.pivot_table(
+                    values="debit_journalier",
+                    index="compteur_id",
+                    columns="date",
+                    aggfunc="mean"
+                )
+                
+                fig = px.imshow(
+                    pivot,
+                    labels=dict(x="Date", y="Compteur", color="Débit"),
+                    title="Heatmap - Débit Journalier (Top 20 Compteurs)",
+                    aspect="auto",
+                    color_continuous_scale="RdYlGn"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # Distribution du débit
+            fig = px.histogram(
+                df_debit,
+                x="debit_journalier",
+                nbins=50,
+                title="Distribution du Débit Journalier",
+                labels={"debit_journalier": "Débit Journalier"},
+                color_discrete_sequence=["#1f77b4"]
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Statistiques
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Moyenne", f"{df_debit['debit_journalier'].mean():.0f}")
+            with col2:
+                st.metric("Médiane", f"{df_debit['debit_journalier'].median():.0f}")
+            with col3:
+                st.metric("Max", f"{df_debit['debit_journalier'].max():.0f}")
+            with col4:
+                st.metric("Min", f"{df_debit['debit_journalier'].min():.0f}")
+        else:
+            st.info("Aucune donnée disponible")
+    else:
+        st.info("Données non disponibles")
+
+# ============================================================================
+# TAB 3: ALERTES
+# ============================================================================
+
+with tab3:
+    st.header("🚨 Alertes et Anomalies")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("⚠️ Anomalies Détectées")
+        if anomalies and anomalies.get("data"):
+            df_anomalies = pd.DataFrame(anomalies["data"])
+            if not df_anomalies.empty:
+                st.metric("Nombre d'anomalies", len(df_anomalies))
+                
+                # Graphique par type
+                if "type_anomalie" in df_anomalies.columns:
+                    fig = px.pie(
+                        df_anomalies,
+                        names="type_anomalie",
+                        title="Répartition par Type d'Anomalie",
+                        hole=0.3,
+                        color_discrete_sequence=px.colors.sequential.Reds_r
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                # Top anomalies
+                if "zscore" in df_anomalies.columns:
+                    df_top_anomalies = df_anomalies.nlargest(10, "zscore")
+                    fig = px.bar(
+                        df_top_anomalies,
+                        x="zscore",
+                        y="compteur_id",
+                        orientation="h",
+                        title="Top 10 Anomalies (Z-Score)",
+                        color="zscore",
+                        color_continuous_scale="Reds"
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                with st.expander("📋 Détails des Anomalies"):
+                    st.dataframe(df_anomalies, use_container_width=True)
+            else:
+                st.success("✅ Aucune anomalie détectée")
+        else:
+            st.success("✅ Aucune anomalie")
+    
+    with col2:
+        st.subheader("🔴 Zones de Congestion")
+        if congestion and congestion.get("data"):
+            df_congestion = pd.DataFrame(congestion["data"])
+            if not df_congestion.empty:
+                st.metric("Zones congestionnées", len(df_congestion))
+                
+                # Graphique des dépassements
+                if "depassement_pct" in df_congestion.columns:
+                    df_top_cong = df_congestion.nlargest(10, "depassement_pct")
+                    fig = px.bar(
+                        df_top_cong,
+                        x="depassement_pct",
+                        y="compteur_id",
+                        orientation="h",
+                        title="Top 10 Congestions (% Dépassement)",
+                        color="depassement_pct",
+                        color_continuous_scale="Oranges"
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                with st.expander("📋 Détails des Congestions"):
+                    st.dataframe(df_congestion, use_container_width=True)
+            else:
+                st.success("✅ Aucune congestion")
+        else:
+            st.success("✅ Aucune congestion")
+
+# ============================================================================
+# TAB 4: CORRÉLATIONS
+# ============================================================================
+
+with tab4:
+    st.header("🔗 Corrélations")
     
     with st.spinner("Chargement des corrélations..."):
         corr_data = fetch_correlations(selected_date)
     
     if not corr_data:
-        st.warning("Aucune corrélation disponible pour cette date.")
+        st.warning("Aucune corrélation disponible")
     else:
-        corr_count = corr_data.get("correlations_count", 0)
-        st.success(f"✅ {corr_count} corrélation(s) disponible(s)")
-        
         for corr in corr_data.get("correlations", []):
             corr_name = corr.get("correlation_name", "Inconnue")
             st.subheader(f"🔗 {corr_name}")
             
             data = corr.get("data", [])
             if isinstance(data, list) and len(data) > 0:
-                import pandas as pd
-                df = pd.DataFrame(data)
+                df_corr = pd.DataFrame(data)
                 
-                col1, col2 = st.columns([1, 3])
-                with col1:
-                    st.metric("Nombre de lignes", len(df))
-                with col2:
-                    st.dataframe(df.head(10), use_container_width=True)
+                # Visualisation selon les colonnes disponibles
+                if "correlation" in df_corr.columns:
+                    fig = px.bar(
+                        df_corr.head(20),
+                        x=df_corr.columns[0],
+                        y="correlation",
+                        title=f"Corrélation - {corr_name}",
+                        color="correlation",
+                        color_continuous_scale="RdBu"
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
                 
-                if st.button(f"Voir toutes les données - {corr_name}", key=f"corr_{corr_name}"):
-                    st.dataframe(df, use_container_width=True)
+                with st.expander("📊 Voir les données"):
+                    st.dataframe(df_corr, use_container_width=True)
             else:
-                st.info(f"Données: {data}")
-            
-            st.divider()
-
-# ============================================================================
-# ONGLET 3 : RAPPORTS
-# ============================================================================
-
-with tab3:
-    st.header(f"📈 Rapports - {selected_date}")
-    
-    with st.spinner("Chargement des rapports..."):
-        reports_data = fetch_reports(selected_date)
-    
-    if not reports_data:
-        st.warning("Aucun rapport disponible pour cette date.")
-    else:
-        reports_count = reports_data.get("reports_count", 0)
-        st.success(f"✅ {reports_count} rapport(s) disponible(s)")
-        
-        for report in reports_data.get("reports", []):
-            report_type = report.get("report_type", "Inconnu")
-            st.subheader(f"📄 {report_type}")
-            
-            report_data = report.get("report", {})
-            
-            # Afficher le contenu du rapport
-            if isinstance(report_data, dict):
-                for key, value in report_data.items():
-                    with st.expander(f"📋 {key}", expanded=True):
-                        if isinstance(value, (list, dict)):
-                            st.json(value)
-                        else:
-                            st.write(value)
-            else:
-                st.json(report_data)
-            
-            st.divider()
+                st.info("Aucune donnée de corrélation")
 
 # Footer
 st.divider()
 st.markdown("""
-<div style='text-align: center; color: #888;'>
-    <p>🚴 CityFlow Analytics Dashboard v1.0.0</p>
-    <p>Données en temps réel depuis DynamoDB via API FastAPI</p>
+<div style='text-align: center; color: #888; padding: 2rem;'>
+    <p style='font-size: 1.2rem;'>🚴 <b>CityFlow Analytics Dashboard</b> v2.0</p>
+    <p>Visualisation en temps réel des données de mobilité cyclable à Paris</p>
+    <p>Données : DynamoDB | API : FastAPI | Dashboard : Streamlit</p>
 </div>
 """, unsafe_allow_html=True)
-

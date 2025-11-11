@@ -198,46 +198,84 @@ class OutputWriter:
     def write_correlations(self, date: str, correlations: Dict[str, List[Dict]]) -> bool:
         """
         Écrit les corrélations dans la base de données appropriée.
+        Chaque corrélation est sauvegardée séparément avec date + correlation_name comme clés.
         
         Args:
             date: Date du traitement (YYYY-MM-DD)
             correlations: Dictionnaire des corrélations à sauvegarder
         
         Returns:
-            True si l'écriture a réussi
+            True si toutes les écritures ont réussi
         """
-        if self.config.is_local:
-            return self._write_to_mongodb(
-                collection=self.config.correlations_table,
-                data={"date": date, "correlations": correlations, "timestamp": datetime.utcnow().isoformat()}
-            )
-        else:
-            return self._write_to_dynamodb(
-                table_name=self.config.correlations_table,
-                item={"date": date, "correlations": correlations, "timestamp": datetime.utcnow().isoformat()}
-            )
+        success_count = 0
+        total_count = len(correlations)
+        
+        for corr_name, corr_data in correlations.items():
+            data = {
+                "date": date,
+                "correlation_name": corr_name,
+                "data": corr_data,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+            
+            if self.config.is_local:
+                success = self._write_to_mongodb(
+                    collection=self.config.correlations_table,
+                    data=data,
+                    query_filter={"date": date, "correlation_name": corr_name}
+                )
+            else:
+                success = self._write_to_dynamodb(
+                    table_name=self.config.correlations_table,
+                    item=data
+                )
+            
+            if success:
+                success_count += 1
+        
+        print(f"      → {success_count}/{total_count} corrélations sauvegardées")
+        return success_count > 0
     
     def write_reports(self, date: str, reports: Dict[str, Any]) -> bool:
         """
         Écrit les rapports dans la base de données appropriée.
+        Chaque rapport est sauvegardé séparément avec date + report_type comme clés.
         
         Args:
             date: Date du traitement (YYYY-MM-DD)
             reports: Dictionnaire des rapports à sauvegarder
         
         Returns:
-            True si l'écriture a réussi
+            True si toutes les écritures ont réussi
         """
-        if self.config.is_local:
-            return self._write_to_mongodb(
-                collection=self.config.reports_table,
-                data={"date": date, "reports": reports, "timestamp": datetime.utcnow().isoformat()}
-            )
-        else:
-            return self._write_to_dynamodb(
-                table_name=self.config.reports_table,
-                item={"date": date, "reports": reports, "timestamp": datetime.utcnow().isoformat()}
-            )
+        success_count = 0
+        total_count = len(reports)
+        
+        for report_type, report_data in reports.items():
+            data = {
+                "date": date,
+                "report_type": report_type,
+                "report": report_data,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+            
+            if self.config.is_local:
+                success = self._write_to_mongodb(
+                    collection=self.config.reports_table,
+                    data=data,
+                    query_filter={"date": date, "report_type": report_type}
+                )
+            else:
+                success = self._write_to_dynamodb(
+                    table_name=self.config.reports_table,
+                    item=data
+                )
+            
+            if success:
+                success_count += 1
+        
+        print(f"      → {success_count}/{total_count} rapports sauvegardés")
+        return success_count > 0
     
     def _write_to_mongodb(self, collection: str, data: Dict[str, Any], query_filter: Dict[str, Any] = None) -> bool:
         """Écrit dans MongoDB."""
