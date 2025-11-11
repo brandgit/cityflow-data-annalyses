@@ -111,22 +111,23 @@ def _quality_summary(results: Dict[str, PipelineResult]) -> List[Dict[str, objec
     return summary
 
 
-def _materialise_outputs(output_root: Path, date: str, outputs: DailyProcessingOutput, writer: OutputWriter = None) -> None:
+def _materialise_outputs(output_root: Path | None, date: str, outputs: DailyProcessingOutput, writer: OutputWriter = None) -> None:
     """
     Sauvegarde les outputs :
-    - Agrégats : fichiers JSON locaux uniquement (pour compatibilité)
+    - Agrégats : fichiers JSON locaux uniquement (pour compatibilité) si output_root fourni
     - Métriques, corrélations et rapports : base de données uniquement (MongoDB ou DynamoDB)
     """
-    base_dir = output_root / date
-    metrics_dir = base_dir / "metrics"
-    metrics_dir.mkdir(parents=True, exist_ok=True)
+    # Sauvegarder uniquement les agrégats en local si output_root est fourni
+    if output_root:
+        base_dir = output_root / date
+        metrics_dir = base_dir / "metrics"
+        metrics_dir.mkdir(parents=True, exist_ok=True)
 
-    # Sauvegarder uniquement les agrégats en local (pour compatibilité)
-    for name, dataframe in outputs.aggregates.items():
-        if dataframe.empty:
-            continue
-        target = metrics_dir / f"{name}.json"
-        dataframe.to_json(target, orient="records", indent=2, force_ascii=False)
+        for name, dataframe in outputs.aggregates.items():
+            if dataframe.empty:
+                continue
+            target = metrics_dir / f"{name}.json"
+            dataframe.to_json(target, orient="records", indent=2, force_ascii=False)
 
     # Générer les rapports (pour la base de données)
     report_payload = {
