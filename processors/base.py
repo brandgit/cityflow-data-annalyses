@@ -16,7 +16,7 @@ class Step(Protocol):
         ...
 
 
-@dataclass(slots=True)
+@dataclass
 class QualityReport:
     """Represents the outcome of the quality checks for a dataset."""
 
@@ -29,7 +29,7 @@ class QualityReport:
             self.passed = False
 
 
-@dataclass(slots=True)
+@dataclass
 class ProcessingContext:
     """Metadata injected into each processing step."""
 
@@ -38,7 +38,7 @@ class ProcessingContext:
     extra: Dict[str, object] = None
 
 
-@dataclass(slots=True)
+@dataclass
 class PipelineResult:
     """Final artefact produced by a pipeline."""
 
