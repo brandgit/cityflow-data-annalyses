@@ -38,7 +38,7 @@ def calculate_debit_horaire(df: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
-def calculate_debit_journalier(df: pd.DataFrame, top_n_compteurs: int = 100, last_n_days: int = 90) -> pd.DataFrame:
+def calculate_debit_journalier(df: pd.DataFrame, top_n_compteurs: int = 50, last_n_days: int = 60) -> pd.DataFrame:
     """
     Débit Journalier (DJ) : Nombre total de vélos par compteur par jour.
     Optimisé pour DynamoDB : limite aux top N compteurs et X derniers jours.
@@ -464,22 +464,31 @@ def calculate_chantiers_actifs(df: pd.DataFrame, date_reference: str = None) -> 
     """
     Chantiers Actifs : Nombre de chantiers actifs par arrondissement à une date donnée.
     """
-    if df.empty or "date_debut" not in df.columns or "date_fin" not in df.columns:
-        return pd.DataFrame()
+    if df.empty:
+        return pd.DataFrame({"nb_chantiers_actifs": [0]})
     
     frame = df.copy()
-    frame["date_debut"] = pd.to_datetime(frame["date_debut"], errors="coerce")
-    frame["date_fin"] = pd.to_datetime(frame["date_fin"], errors="coerce")
     
-    if date_reference is None:
-        date_ref = pd.Timestamp.now()
+    # Si les colonnes de dates existent, filtrer par date
+    if "date_debut" in frame.columns and "date_fin" in frame.columns:
+        frame["date_debut"] = pd.to_datetime(frame["date_debut"], errors="coerce")
+        frame["date_fin"] = pd.to_datetime(frame["date_fin"], errors="coerce")
+        
+        if date_reference is None:
+            date_ref = pd.Timestamp.now()
+        else:
+            date_ref = pd.to_datetime(date_reference)
+        
+        # Filtrer les chantiers actifs
+        actifs = frame[
+            (frame["date_debut"] <= date_ref) & (frame["date_fin"] >= date_ref)
+        ].copy()
     else:
-        date_ref = pd.to_datetime(date_reference)
+        # Si pas de dates, considérer tous les chantiers comme actifs
+        actifs = frame.copy()
     
-    # Filtrer les chantiers actifs
-    actifs = frame[
-        (frame["date_debut"] <= date_ref) & (frame["date_fin"] >= date_ref)
-    ].copy()
+    if actifs.empty:
+        return pd.DataFrame({"nb_chantiers_actifs": [0]})
     
     if "arrondissement" in actifs.columns:
         result = (
@@ -498,7 +507,7 @@ def calculate_score_criticite_chantiers(df: pd.DataFrame) -> pd.DataFrame:
     Score de Criticité Chantiers : (nb chantiers sur chaussée × surface moyenne).
     """
     if df.empty:
-        return pd.DataFrame()
+        return pd.DataFrame({"nb_chantiers": [0], "score_criticite": [0.0]})
     
     frame = df.copy()
     
@@ -508,6 +517,10 @@ def calculate_score_criticite_chantiers(df: pd.DataFrame) -> pd.DataFrame:
     else:
         sur_chaussee = frame.copy()
     
+    if sur_chaussee.empty:
+        return pd.DataFrame({"nb_chantiers": [0], "score_criticite": [0.0]})
+    
+    # Si les colonnes nécessaires existent, calculer le score détaillé
     if "arrondissement" in sur_chaussee.columns and "surface" in sur_chaussee.columns:
         criticite = (
             sur_chaussee.groupby("arrondissement")
@@ -521,7 +534,11 @@ def calculate_score_criticite_chantiers(df: pd.DataFrame) -> pd.DataFrame:
             criticite["nb_chantiers_chaussee"] * criticite["surface_moyenne"]
         ).round(2)
     else:
-        criticite = pd.DataFrame()
+        # Retour basique : juste le nombre de chantiers
+        criticite = pd.DataFrame({
+            "nb_chantiers": [len(sur_chaussee)],
+            "score_criticite": [len(sur_chaussee) * 1.0]
+        })
     
     return criticite
 
@@ -535,8 +552,9 @@ def calculate_qualite_service_aggregate(df: pd.DataFrame) -> pd.DataFrame:
     Agrégation Qualité de Service : Par opérateur, mode, trimestre.
     """
     if df.empty:
-        return pd.DataFrame()
+        return pd.DataFrame({"nb_enregistrements": [0]})
     
+    # Identifier les colonnes de groupement disponibles
     group_cols = []
     if "operateur" in df.columns:
         group_cols.append("operateur")
@@ -545,18 +563,39 @@ def calculate_qualite_service_aggregate(df: pd.DataFrame) -> pd.DataFrame:
     if "trimestre" in df.columns:
         group_cols.append("trimestre")
     
-    if not group_cols:
-        return pd.DataFrame()
-    
+    # Identifier les colonnes d'agrégation disponibles
     agg_dict = {}
     if "score_qualite" in df.columns:
         agg_dict["score_qualite_moyen"] = ("score_qualite", "mean")
     if "penalites" in df.columns:
         agg_dict["penalites_total"] = ("penalites", "sum")
     
-    if not agg_dict:
-        return pd.DataFrame()
+    # Si ni colonnes de groupement ni colonnes d'agrégation, retourner un résumé basique
+    if not group_cols and not agg_dict:
+        return pd.DataFrame({
+            "nb_enregistrements": [len(df)],
+            "description": ["Données qualité service disponibles"]
+        })
     
+    # Si pas de colonnes de groupement mais des agrégations, faire un résumé global
+    if not group_cols:
+        result_dict = {"nb_enregistrements": [len(df)]}
+        if "score_qualite" in df.columns:
+            result_dict["score_qualite_moyen"] = [df["score_qualite"].mean()]
+        if "penalites" in df.columns:
+            result_dict["penalites_total"] = [df["penalites"].sum()]
+        return pd.DataFrame(result_dict)
+    
+    # Si pas d'agrégations, juste compter par groupe
+    if not agg_dict:
+        result = (
+            df.groupby(group_cols)
+            .size()
+            .reset_index(name="nb_enregistrements")
+        )
+        return result
+    
+    # Cas normal : groupement + agrégation
     result = (
         df.groupby(group_cols)
         .agg(**agg_dict)
