@@ -145,8 +145,10 @@ class OutputWriter:
         Returns:
             True si toutes les écritures ont réussi
         """
+        import json
         success_count = 0
         total_count = len(metrics)
+        failed_metrics = []
         
         # Sauvegarder chaque métrique individuellement
         for metric_name, metric_data in metrics.items():
@@ -156,6 +158,13 @@ class OutputWriter:
                 "data": metric_data,
                 "timestamp": datetime.utcnow().isoformat()
             }
+            
+            # Calculer la taille estimée pour debugging
+            try:
+                size_bytes = len(json.dumps(data, default=str))
+                size_kb = size_bytes / 1024
+            except:
+                size_kb = 0
             
             if self.config.is_local:
                 success = self._write_to_mongodb(
@@ -178,8 +187,12 @@ class OutputWriter:
             
             if success:
                 success_count += 1
+            else:
+                failed_metrics.append(f"{metric_name} (~{size_kb:.0f} KB)")
         
         print(f"      → {success_count}/{total_count} métriques sauvegardées")
+        if failed_metrics:
+            print(f"      ⚠️  Métriques échouées: {', '.join(failed_metrics)}")
         return success_count > 0
     
     def write_correlations(self, date: str, correlations: Dict[str, List[Dict]]) -> bool:
