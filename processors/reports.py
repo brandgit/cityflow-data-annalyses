@@ -285,10 +285,12 @@ def generate_profil_jour_type_report(metrics: Dict[str, Any]) -> Dict[str, Any]:
     }
     
     if "profil_jour_type" in metrics:
-        profils = metrics["profil_jour_type"]
-        for jour, df in profils.items():
-            if not df.empty:
-                report["profils"][jour] = _df_to_records(df)
+        profil_df = metrics["profil_jour_type"]
+        if isinstance(profil_df, pd.DataFrame) and not profil_df.empty:
+            # Grouper par jour et convertir en dict
+            for jour in profil_df["jour"].unique():
+                jour_data = profil_df[profil_df["jour"] == jour]
+                report["profils"][jour] = _df_to_records(jour_data)
     
     return report
 
