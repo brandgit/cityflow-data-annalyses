@@ -38,15 +38,33 @@ def calculate_debit_horaire(df: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
-def calculate_debit_journalier(df: pd.DataFrame) -> pd.DataFrame:
+def calculate_debit_journalier(df: pd.DataFrame, top_n_compteurs: int = 100, last_n_days: int = 90) -> pd.DataFrame:
     """
     Débit Journalier (DJ) : Nombre total de vélos par compteur par jour.
+    Optimisé pour DynamoDB : limite aux top N compteurs et X derniers jours.
     """
     if df.empty or "compteur_id" not in df.columns or "date_heure" not in df.columns:
         return pd.DataFrame()
     
     frame = df.copy()
     frame["date"] = pd.to_datetime(frame["date_heure"], errors="coerce").dt.date
+    
+    # Identifier les top N compteurs les plus actifs
+    top_compteurs = (
+        frame.groupby("compteur_id")["comptage_horaire"]
+        .sum()
+        .nlargest(top_n_compteurs)
+        .index
+    )
+    
+    # Filtrer sur les top compteurs
+    frame = frame[frame["compteur_id"].isin(top_compteurs)]
+    
+    # Limiter aux X derniers jours
+    if not frame.empty:
+        max_date = frame["date"].max()
+        min_date = pd.to_datetime(max_date) - pd.Timedelta(days=last_n_days)
+        frame = frame[frame["date"] >= min_date.date()]
     
     result = (
         frame.groupby(["compteur_id", "date"])["comptage_horaire"]
@@ -360,9 +378,10 @@ def calculate_ratio_weekend_semaine(df: pd.DataFrame) -> Dict[str, Any]:
 # 6. MÉTRIQUES D'ALERTES ET DÉTECTION D'ANOMALIES
 # ============================================================================
 
-def detect_congestion_cyclable(df: pd.DataFrame, seuil_pct: float = 150.0) -> pd.DataFrame:
+def detect_congestion_cyclable(df: pd.DataFrame, seuil_pct: float = 150.0, max_results: int = 500) -> pd.DataFrame:
     """
     Alertes de Congestion Cyclable : Débit > seuil% de la moyenne.
+    Optimisé pour DynamoDB : limite aux N congestions les plus importantes.
     """
     if df.empty or "compteur_id" not in df.columns or "comptage_horaire" not in df.columns:
         return pd.DataFrame()
@@ -388,12 +407,19 @@ def detect_congestion_cyclable(df: pd.DataFrame, seuil_pct: float = 150.0) -> pd
         ((congestions["comptage_horaire"] / congestions["debit_moyen"]) - 1) * 100
     ).round(2)
     
-    return congestions[["compteur_id", "date_heure", "comptage_horaire", "debit_moyen", "seuil_pct", "depassement_pct"]]
+    result = congestions[["compteur_id", "date_heure", "comptage_horaire", "debit_moyen", "seuil_pct", "depassement_pct"]]
+    
+    # Limiter aux N congestions les plus importantes (tri par dépassement)
+    if len(result) > max_results:
+        result = result.nlargest(max_results, "depassement_pct")
+    
+    return result
 
 
-def detect_anomalies_zscore(df: pd.DataFrame, seuil_zscore: float = 3.0) -> pd.DataFrame:
+def detect_anomalies_zscore(df: pd.DataFrame, seuil_zscore: float = 3.0, max_results: int = 200) -> pd.DataFrame:
     """
     Détection d'Anomalies : Écarts significatifs par rapport au profil attendu (Z-score).
+    Optimisé pour DynamoDB : limite aux N anomalies les plus critiques.
     """
     if df.empty or "compteur_id" not in df.columns or "comptage_horaire" not in df.columns:
         return pd.DataFrame()
@@ -420,7 +446,14 @@ def detect_anomalies_zscore(df: pd.DataFrame, seuil_zscore: float = 3.0) -> pd.D
         lambda x: "pic_exceptionnel" if x > 0 else "creux_exceptionnel"
     )
     
-    return anomalies[["compteur_id", "date_heure", "comptage_horaire", "mean", "std", "zscore", "type_anomalie"]]
+    result = anomalies[["compteur_id", "date_heure", "comptage_horaire", "mean", "std", "zscore", "type_anomalie"]]
+    
+    # Limiter aux N anomalies les plus critiques (tri par |zscore| absolu)
+    if len(result) > max_results:
+        result = result.assign(zscore_abs=result["zscore"].abs())
+        result = result.nlargest(max_results, "zscore_abs").drop(columns=["zscore_abs"])
+    
+    return result
 
 
 # ============================================================================
