@@ -228,9 +228,10 @@ def calculate_top_compteurs(df: pd.DataFrame, top_n: int = 200) -> pd.DataFrame:
     if "latitude" in df.columns and "longitude" in df.columns:
         coords = df[["compteur_id", "latitude", "longitude"]].drop_duplicates("compteur_id")
         top = top.merge(coords, on="compteur_id", how="left")
-        return top[["rang", "compteur_id", "dmja", "latitude", "longitude"]]
-    
-    return top[["rang", "compteur_id", "dmja"]]
+
+    base_cols = ["rang", "compteur_id", "dmja"]
+    optional_cols = [col for col in ["latitude", "longitude"] if col in top.columns]
+    return top[base_cols + optional_cols]
 
 
 def calculate_compteurs_faible_activite(df: pd.DataFrame, seuil_pct: float = 20.0) -> pd.DataFrame:
