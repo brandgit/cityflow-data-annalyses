@@ -113,6 +113,16 @@ def fetch_correlations(date: str) -> Optional[dict]:
     except:
         return None
 
+def fetch_reports(date: str) -> Optional[dict]:
+    """Récupère les rapports."""
+    try:
+        response = requests.get(f"{API_URL}/reports/{date}", timeout=30)
+        if response.status_code == 200:
+            return response.json()
+        return None
+    except:
+        return None
+
 # ============================================================================
 # SIDEBAR
 # ============================================================================
@@ -558,7 +568,7 @@ with tab5:
     st.header("📄 Rapports Quotidiens")
     
     with st.spinner("Chargement des rapports..."):
-        reports_data = fetch_data_from_api(f"/reports/{selected_date}")
+        reports_data = fetch_reports(selected_date)
     
     if not reports_data or not reports_data.get("reports"):
         st.warning("Aucun rapport disponible pour cette date")
