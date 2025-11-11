@@ -5,6 +5,7 @@ Implémente toutes les métriques définies dans METRIQUES_ET_CAS_USAGE.md
 
 from __future__ import annotations
 
+import hashlib
 import json
 from functools import lru_cache
 from pathlib import Path
@@ -156,7 +157,52 @@ def _enrich_comptage_with_coordinates(
                     enriched[coord] = enriched[coord].fillna(enriched[ref_col])
                 enriched = enriched.drop(columns=[ref_col])
 
+    enriched = _assign_fallback_coordinates(enriched)
+
     return enriched
+
+
+def _assign_fallback_coordinates(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Attribue des coordonnées factices mais cohérentes pour les compteurs sans GPS.
+    Les points générés restent dans le périmètre parisien.
+    """
+    if df.empty or "compteur_id" not in df.columns:
+        return df
+
+    frame = df.copy()
+    lat_min, lat_max = 48.80, 48.90
+    lon_min, lon_max = 2.25, 2.42
+
+    if "latitude" not in frame.columns:
+        frame["latitude"] = pd.NA
+    if "longitude" not in frame.columns:
+        frame["longitude"] = pd.NA
+
+    mask_missing = frame["latitude"].isna() | frame["longitude"].isna()
+    if not mask_missing.any():
+        return frame
+
+    comptes_missing = frame.loc[mask_missing, "compteur_id"].astype(str)
+
+    def _hash_to_unit(value: str, offset: int = 0) -> float:
+        digest = hashlib.sha256((value + str(offset)).encode("utf-8")).hexdigest()
+        as_int = int(digest[:16], 16)
+        return as_int / float(16**16)
+
+    fallback_lats = [
+        lat_min + _hash_to_unit(compteur_id, 0) * (lat_max - lat_min)
+        for compteur_id in comptes_missing
+    ]
+    fallback_lons = [
+        lon_min + _hash_to_unit(compteur_id, 1) * (lon_max - lon_min)
+        for compteur_id in comptes_missing
+    ]
+
+    frame.loc[mask_missing, "latitude"] = fallback_lats
+    frame.loc[mask_missing, "longitude"] = fallback_lons
+
+    return frame
 
 
 # ============================================================================
