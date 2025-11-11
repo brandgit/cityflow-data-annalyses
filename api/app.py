@@ -65,19 +65,6 @@ def get_metric_dates(limit: int = Query(25, ge=1, le=200)) -> Dict[str, List[str
 
 
 @app.get(
-    "/metrics/dates",
-    summary="Liste les dates disponibles (métriques) - Alias",
-    response_description="Dates pour lesquelles des métriques sont disponibles.",
-)
-def get_metric_dates_alias(limit: int = Query(25, ge=1, le=200)) -> Dict[str, List[str]]:
-    """
-    Alias pour /metrics - Retourne les dates disponibles.
-    """
-    dates = list(list_available_dates(limit=limit))
-    return {"dates": dates}
-
-
-@app.get(
     "/metrics/names",
     summary="Liste tous les noms de métriques disponibles",
     response_description="Liste des 18 métriques CityFlow Analytics.",

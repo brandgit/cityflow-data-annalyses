@@ -59,13 +59,39 @@ def check_api() -> bool:
         return False
 
 def get_dates() -> list:
+    """Liste des dates disponibles pour les métriques."""
     try:
         r = requests.get(f"{API_URL}/metrics", timeout=10)
         return r.json().get("dates", []) if r.status_code == 200 else []
     except:
         return []
 
+def get_metric_names() -> list:
+    """Liste de tous les noms de métriques disponibles."""
+    try:
+        r = requests.get(f"{API_URL}/metrics/names", timeout=10)
+        return r.json().get("metric_names", []) if r.status_code == 200 else []
+    except:
+        return []
+
+def get_correlation_dates() -> list:
+    """Liste des dates disponibles pour les corrélations."""
+    try:
+        r = requests.get(f"{API_URL}/correlations", timeout=10)
+        return r.json().get("dates", []) if r.status_code == 200 else []
+    except:
+        return []
+
+def get_report_dates() -> list:
+    """Liste des dates disponibles pour les rapports."""
+    try:
+        r = requests.get(f"{API_URL}/reports", timeout=10)
+        return r.json().get("dates", []) if r.status_code == 200 else []
+    except:
+        return []
+
 def get_metric(date: str, name: str) -> Optional[dict]:
+    """Récupère une métrique spécifique pour une date."""
     try:
         r = requests.get(f"{API_URL}/metrics/{date}/{name}", timeout=30)
         return r.json() if r.status_code == 200 else None
@@ -73,6 +99,7 @@ def get_metric(date: str, name: str) -> Optional[dict]:
         return None
 
 def get_all_metrics(date: str) -> Optional[dict]:
+    """Récupère toutes les métriques pour une date."""
     try:
         r = requests.get(f"{API_URL}/metrics/{date}", timeout=30)
         return r.json() if r.status_code == 200 else None
@@ -80,6 +107,7 @@ def get_all_metrics(date: str) -> Optional[dict]:
         return None
 
 def get_correlations(date: str) -> Optional[dict]:
+    """Récupère les corrélations pour une date."""
     try:
         r = requests.get(f"{API_URL}/correlations/{date}", timeout=30)
         return r.json() if r.status_code == 200 else None
@@ -87,8 +115,17 @@ def get_correlations(date: str) -> Optional[dict]:
         return None
 
 def get_reports(date: str) -> Optional[dict]:
+    """Récupère les rapports pour une date."""
     try:
         r = requests.get(f"{API_URL}/reports/{date}", timeout=30)
+        return r.json() if r.status_code == 200 else None
+    except:
+        return None
+
+def get_specific_report(date: str, report_type: str) -> Optional[dict]:
+    """Récupère un rapport spécifique pour une date."""
+    try:
+        r = requests.get(f"{API_URL}/reports/{date}?report_type={report_type}", timeout=30)
         return r.json() if r.status_code == 200 else None
     except:
         return None
@@ -208,12 +245,13 @@ st.divider()
 # ONGLETS PRINCIPAUX
 # ============================================================================
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "📊 Vue d'Ensemble",
     "🚴 Flux Vélos", 
     "🚨 Alertes & Anomalies",
     "🔗 Corrélations",
-    "📄 Rapports"
+    "📄 Rapports",
+    "🔍 API Explorer"
 ])
 
 # ============================================================================
@@ -1041,6 +1079,175 @@ with tab5:
                         st.dataframe(df, use_container_width=True)
                 else:
                     st.write(report_content)
+
+# ============================================================================
+# TAB 6: API EXPLORER
+# ============================================================================
+
+with tab6:
+    st.header("🔍 API Explorer")
+    st.markdown("Explorez tous les endpoints disponibles de l'API CityFlow Analytics")
+    
+    # Section 1: Informations générales
+    st.subheader("📡 Informations API")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("🌐 URL de l'API", API_URL.replace("http://", "").replace(":8000", ""))
+        if check_api():
+            st.success("✅ API Connectée")
+        else:
+            st.error("❌ API Déconnectée")
+    
+    with col2:
+        metric_names = get_metric_names()
+        st.metric("📊 Métriques disponibles", len(metric_names))
+    
+    with col3:
+        dates = get_dates()
+        st.metric("📅 Dates disponibles", len(dates))
+    
+    st.divider()
+    
+    # Section 2: Liste des endpoints
+    st.subheader("🔗 Endpoints Disponibles")
+    
+    endpoints_data = {
+        "Catégorie": [
+            "Health", 
+            "Métriques", "Métriques", "Métriques", "Métriques",
+            "Corrélations", "Corrélations",
+            "Rapports", "Rapports", "Rapports"
+        ],
+        "Endpoint": [
+            "/health",
+            "/metrics", "/metrics/names", "/metrics/{date}", "/metrics/{date}/{metric_name}",
+            "/correlations", "/correlations/{date}",
+            "/reports", "/reports/{date}", "/reports/{date}?report_type=..."
+        ],
+        "Description": [
+            "État de santé de l'API",
+            "Liste des dates (métriques)", "Liste des noms de métriques", 
+            "Toutes les métriques d'une date", "Une métrique spécifique",
+            "Liste des dates (corrélations)", "Corrélations d'une date",
+            "Liste des dates (rapports)", "Tous les rapports d'une date", "Un rapport spécifique"
+        ],
+        "URL": [
+            f"{API_URL}/health",
+            f"{API_URL}/metrics", f"{API_URL}/metrics/names",
+            f"{API_URL}/metrics/{{date}}", f"{API_URL}/metrics/{{date}}/{{metric_name}}",
+            f"{API_URL}/correlations", f"{API_URL}/correlations/{{date}}",
+            f"{API_URL}/reports", f"{API_URL}/reports/{{date}}", f"{API_URL}/reports/{{date}}?report_type=..."
+        ]
+    }
+    
+    df_endpoints = pd.DataFrame(endpoints_data)
+    st.dataframe(df_endpoints, use_container_width=True, hide_index=True)
+    
+    st.divider()
+    
+    # Section 3: Testeur d'endpoint
+    st.subheader("🧪 Testeur d'Endpoint")
+    
+    test_col1, test_col2 = st.columns([2, 1])
+    
+    with test_col1:
+        endpoint_category = st.selectbox(
+            "Catégorie",
+            ["Métriques", "Corrélations", "Rapports"]
+        )
+    
+    with test_col2:
+        test_date = st.selectbox("Date", dates if dates else ["2025-11-11"])
+    
+    if endpoint_category == "Métriques":
+        metric_option = st.radio(
+            "Type de requête",
+            ["Toutes les métriques", "Une métrique spécifique"]
+        )
+        
+        if metric_option == "Toutes les métriques":
+            if st.button("🚀 Tester /metrics/{date}"):
+                with st.spinner("Chargement..."):
+                    result = get_all_metrics(test_date)
+                    if result:
+                        st.success(f"✅ {result.get('metrics_count', 0)} métriques trouvées")
+                        st.json(result)
+                    else:
+                        st.error("❌ Aucune donnée")
+        else:
+            metric_names = get_metric_names()
+            selected_metric = st.selectbox("Métrique", metric_names if metric_names else ["debit_journalier"])
+            
+            if st.button(f"🚀 Tester /metrics/{test_date}/{selected_metric}"):
+                with st.spinner("Chargement..."):
+                    result = get_metric(test_date, selected_metric)
+                    if result:
+                        st.success("✅ Métrique trouvée")
+                        st.json(result)
+                    else:
+                        st.error("❌ Métrique introuvable")
+    
+    elif endpoint_category == "Corrélations":
+        if st.button(f"🚀 Tester /correlations/{test_date}"):
+            with st.spinner("Chargement..."):
+                result = get_correlations(test_date)
+                if result:
+                    st.success(f"✅ {result.get('correlations_count', 0)} corrélations trouvées")
+                    st.json(result)
+                else:
+                    st.error("❌ Aucune corrélation")
+    
+    elif endpoint_category == "Rapports":
+        report_option = st.radio(
+            "Type de requête",
+            ["Tous les rapports", "Un rapport spécifique"]
+        )
+        
+        if report_option == "Tous les rapports":
+            if st.button(f"🚀 Tester /reports/{test_date}"):
+                with st.spinner("Chargement..."):
+                    result = get_reports(test_date)
+                    if result:
+                        st.success(f"✅ {result.get('reports_count', 0)} rapports trouvés")
+                        st.json(result)
+                    else:
+                        st.error("❌ Aucun rapport")
+        else:
+            report_type = st.selectbox(
+                "Type de rapport",
+                ["processing_report", "metrics_summary", "rapport_quotidien"]
+            )
+            
+            if st.button(f"🚀 Tester /reports/{test_date}?report_type={report_type}"):
+                with st.spinner("Chargement..."):
+                    result = get_specific_report(test_date, report_type)
+                    if result:
+                        st.success("✅ Rapport trouvé")
+                        st.json(result)
+                    else:
+                        st.error("❌ Rapport introuvable")
+    
+    st.divider()
+    
+    # Section 4: Documentation
+    st.subheader("📚 Documentation")
+    st.markdown(f"""
+    **Documentation interactive Swagger :**  
+    [{API_URL}/docs]({API_URL}/docs)
+    
+    **Liste complète des métriques CityFlow :**
+    """)
+    
+    metric_names = get_metric_names()
+    if metric_names:
+        cols = st.columns(3)
+        for idx, metric_name in enumerate(metric_names):
+            with cols[idx % 3]:
+                st.markdown(f"- `{metric_name}`")
+    else:
+        st.info("Liste des métriques non disponible")
 
 # ============================================================================
 # FOOTER
