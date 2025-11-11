@@ -685,22 +685,30 @@ with tab2:
     if not df_ratio.empty:
         st.subheader("📅 Ratio Weekend / Semaine")
         
-        if "ratio" in df_ratio.columns and "compteur_id" in df_ratio.columns:
-            fig = px.scatter(
-                df_ratio.head(30),
-                x="compteur_id",
-                y="ratio",
-                size="ratio",
-                color="ratio",
-                title="Ratio Weekend/Semaine par Compteur",
-                labels={"ratio": "Ratio", "compteur_id": "Compteur"},
-                color_continuous_scale="RdYlGn",
-                height=400
-            )
-            fig.add_hline(y=1, line_dash="dash", line_color="red", annotation_text="Équilibre")
-            st.plotly_chart(fig, use_container_width=True)
+        required_cols = {"debit_weekend", "debit_semaine", "ratio_weekend_semaine", "difference_pct"}
+        if required_cols.issubset(df_ratio.columns):
+            row = df_ratio.iloc[0]
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Débit weekend", f"{row['debit_weekend']:,.0f}")
+            col2.metric("Débit semaine", f"{row['debit_semaine']:,.0f}")
+            col3.metric("Ratio W/E", f"{row['ratio_weekend_semaine']:.2f}", delta=f"{row['difference_pct']:.1f}%")
             
-            st.caption("Ratio > 1 : Plus d'activité le weekend | Ratio < 1 : Plus d'activité en semaine")
+            gauge_max = max(2.0, row["ratio_weekend_semaine"] * 1.2)
+            fig = go.Figure(
+                go.Indicator(
+                    mode="gauge+number",
+                    value=row["ratio_weekend_semaine"],
+                    gauge={
+                        "axis": {"range": [0, gauge_max]},
+                        "threshold": {"line": {"color": "red", "width": 4}, "value": 1},
+                        "bar": {"color": "#2ca02c"},
+                    },
+                    title={"text": "Ratio Weekend / Semaine"},
+                )
+            )
+            fig.update_layout(height=260)
+            st.plotly_chart(fig, use_container_width=True)
+            st.caption("Ratio > 1 : trafic plus fort le week-end · Ratio < 1 : trafic plus fort en semaine")
     
     st.divider()
     
@@ -709,30 +717,26 @@ with tab2:
     if not df_horaire.empty:
         st.subheader("⏱️ Débit Horaire Détaillé")
         
-        if "heure" in df_horaire.columns:
-            value_col = None
-            for col in ["debit_horaire", "debit_moyen", "comptage"]:
-                if col in df_horaire.columns:
-                    value_col = col
-                    break
+        horaire_cols = {"compteur_id", "debit_horaire_moyen", "debit_horaire_median", "debit_horaire_max"}
+        if horaire_cols.issubset(df_horaire.columns):
+            top_horaire = df_horaire.nlargest(20, "debit_horaire_moyen")
+            fig = px.bar(
+                top_horaire.sort_values("debit_horaire_moyen"),
+                x="debit_horaire_moyen",
+                y="compteur_id",
+                orientation="h",
+                color="debit_horaire_moyen",
+                color_continuous_scale="Viridis",
+                title="Top 20 Compteurs par Débit Horaire Moyen",
+                labels={"debit_horaire_moyen": "Débit horaire moyen", "compteur_id": "Compteur"},
+                height=520
+            )
+            st.plotly_chart(fig, use_container_width=True)
             
-            if value_col:
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(
-                    x=df_horaire["heure"],
-                    y=df_horaire[value_col],
-                    mode='lines+markers',
-                    line=dict(color='#2ca02c', width=2),
-                    marker=dict(size=6),
-                    fill='tonexty'
-                ))
-                fig.update_layout(
-                    title="Évolution Horaire du Trafic",
-                    xaxis_title="Heure",
-                    yaxis_title=value_col.replace("_", " ").title(),
-                    height=350
-                )
-                st.plotly_chart(fig, use_container_width=True)
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Débit horaire moyen global", f"{df_horaire['debit_horaire_moyen'].mean():,.0f}")
+            col2.metric("Débit horaire max", f"{df_horaire['debit_horaire_max'].max():,.0f}")
+            col3.metric("Compteurs analysés", len(df_horaire))
     
     st.divider()
     
@@ -741,24 +745,36 @@ with tab2:
     if not df_profil.empty:
         st.subheader("📅 Profil Jour Type")
         
-        if "jour_type" in df_profil.columns:
-            value_col = None
-            for col in ["debit_moyen", "comptage_moyen", "trafic"]:
-                if col in df_profil.columns:
-                    value_col = col
-                    break
-            
+        if {"jour", "heure"}.issubset(df_profil.columns):
+            value_col = "debit_moyen" if "debit_moyen" in df_profil.columns else None
             if value_col:
-                fig = px.bar(
-                    df_profil,
-                    x="jour_type",
-                    y=value_col,
-                    title="Comparaison des Profils de Circulation",
-                    labels={"jour_type": "Type de Jour", value_col: value_col.replace("_", " ").title()},
-                    color=value_col,
-                    color_continuous_scale="Blues"
+                pivot = df_profil.pivot_table(
+                    values=value_col,
+                    index="jour",
+                    columns="heure",
+                    aggfunc="mean"
+                )
+                fig = px.imshow(
+                    pivot,
+                    color_continuous_scale="YlOrBr",
+                    labels=dict(x="Heure", y="Jour", color="Débit moyen"),
+                    title="Heatmap du Profil Jour Type",
+                    aspect="auto",
+                    height=520
                 )
                 st.plotly_chart(fig, use_container_width=True)
+                
+                daily_avg = df_profil.groupby("jour")[value_col].mean().reset_index()
+                fig_bar = px.bar(
+                    daily_avg,
+                    x="jour",
+                    y=value_col,
+                    color=value_col,
+                    color_continuous_scale="Blues",
+                    title="Débit moyen par jour de la semaine",
+                    labels={value_col: "Débit moyen"}
+                )
+                st.plotly_chart(fig_bar, use_container_width=True)
     
     st.divider()
     
@@ -767,87 +783,109 @@ with tab2:
     if not df_dispo.empty:
         st.subheader("✅ Taux de Disponibilité des Compteurs")
         
-        if "taux_disponibilite" in df_dispo.columns:
+        col_name = "taux_disponibilite_pct" if "taux_disponibilite_pct" in df_dispo.columns else "taux_disponibilite"
+        if col_name in df_dispo.columns:
             col1, col2 = st.columns(2)
             
             with col1:
-                avg_dispo = df_dispo["taux_disponibilite"].mean()
-                st.metric("Disponibilité Moyenne", f"{avg_dispo:.1f}%")
+                avg_dispo = df_dispo[col_name].mean()
+                st.metric("Disponibilité moyenne", f"{avg_dispo:.1f}%")
             
             with col2:
-                compteurs_ok = len(df_dispo[df_dispo["taux_disponibilite"] >= 90])
-                st.metric("Compteurs > 90%", compteurs_ok)
+                seuil = 90
+                compteurs_ok = len(df_dispo[df_dispo[col_name] >= seuil])
+                st.metric(f"Compteurs ≥ {seuil}%", compteurs_ok)
             
-            if "compteur_id" in df_dispo.columns:
-                fig = px.histogram(
-                    df_dispo,
-                    x="taux_disponibilite",
-                    nbins=20,
-                    title="Distribution du Taux de Disponibilité",
-                    labels={"taux_disponibilite": "Taux de Disponibilité (%)"},
-                    color_discrete_sequence=["#2ca02c"]
-                )
-                st.plotly_chart(fig, use_container_width=True)
+            fig = px.histogram(
+                df_dispo,
+                x=col_name,
+                nbins=20,
+                title="Distribution du taux de disponibilité",
+                labels={col_name: "Taux de disponibilité (%)"},
+                color_discrete_sequence=["#2ca02c"]
+            )
+            st.plotly_chart(fig, use_container_width=True)
     
     st.divider()
     
     # Corridors cyclables
     df_corridors = safe_dataframe(metrics.get("corridors_cyclables", []))
     if not df_corridors.empty:
-        st.subheader("🛣️ Corridors Cyclables Principaux")
+        st.subheader("🚲 Corridors Cyclables Principaux")
         
-        if "corridor" in df_corridors.columns or "axe" in df_corridors.columns:
-            corridor_col = "corridor" if "corridor" in df_corridors.columns else "axe"
-            value_col = None
-            for col in ["trafic_total", "debit_moyen", "frequence"]:
-                if col in df_corridors.columns:
-                    value_col = col
-                    break
+        if {"dmja", "compteur_id"}.issubset(df_corridors.columns):
+            top_corridors = df_corridors.nlargest(15, "dmja")
+            fig = px.bar(
+                top_corridors.sort_values("dmja"),
+                x="dmja",
+                y="compteur_id",
+                orientation="h",
+                title="Top Corridors Cyclables (DMJA)",
+                labels={"dmja": "DMJA", "compteur_id": "Compteur"},
+                color="dmja",
+                color_continuous_scale="Greens",
+                height=520
+            )
+            st.plotly_chart(fig, use_container_width=True)
             
-            if value_col:
-                top_10 = df_corridors.nlargest(10, value_col)
-                fig = px.bar(
-                    top_10.sort_values(value_col, ascending=True),
-                    y=corridor_col,
-                    x=value_col,
-                    orientation="h",
-                    title="Top 10 Corridors Cyclables",
-                    color=value_col,
-                    color_continuous_scale="Greens"
+            if {"latitude", "longitude"}.issubset(top_corridors.columns):
+                fig_map = px.scatter_mapbox(
+                    top_corridors,
+                    lat="latitude",
+                    lon="longitude",
+                    size="dmja",
+                    color="dmja",
+                    hover_name="compteur_id",
+                    color_continuous_scale="Viridis",
+                    zoom=11,
+                    height=450,
+                    title="Localisation des corridors cyclables",
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                fig_map.update_layout(mapbox_style="carto-positron")
+                st.plotly_chart(fig_map, use_container_width=True)
     
     st.divider()
     
     # Évolution hebdomadaire
     df_hebdo = safe_dataframe(metrics.get("evolution_hebdomadaire", []))
     if not df_hebdo.empty:
-        st.subheader("📊 Évolution Hebdomadaire")
+        st.subheader("📈 Évolution Hebdomadaire")
         
-        if "semaine" in df_hebdo.columns or "jour" in df_hebdo.columns:
-            x_col = "semaine" if "semaine" in df_hebdo.columns else "jour"
-            value_col = None
-            for col in ["trafic_total", "debit_moyen", "comptage"]:
-                if col in df_hebdo.columns:
-                    value_col = col
-                    break
+        if {"periode", "debit_total"}.issubset(df_hebdo.columns):
+            fig = make_subplots(specs=[[{"secondary_y": True}]])
+            fig.add_trace(
+                go.Scatter(
+                    x=df_hebdo["periode"],
+                    y=df_hebdo["debit_total"],
+                    mode="lines+markers",
+                    name="Débit total",
+                    line=dict(color="#ff7f0e", width=3),
+                    marker=dict(size=8),
+                ),
+                secondary_y=False,
+            )
             
-            if value_col:
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(
-                    x=df_hebdo[x_col],
-                    y=df_hebdo[value_col],
-                    mode='lines+markers',
-                    line=dict(color='#ff7f0e', width=3),
-                    marker=dict(size=8)
-                ))
-                fig.update_layout(
-                    title="Tendance Hebdomadaire du Trafic",
-                    xaxis_title=x_col.title(),
-                    yaxis_title=value_col.replace("_", " ").title(),
-                    height=400
+            if "taux_croissance_pct" in df_hebdo.columns:
+                fig.add_trace(
+                    go.Bar(
+                        x=df_hebdo["periode"],
+                        y=df_hebdo["taux_croissance_pct"],
+                        name="Croissance (%)",
+                        marker_color="#1f77b4",
+                        opacity=0.4,
+                    ),
+                    secondary_y=True,
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                fig.update_yaxes(title_text="Croissance (%)", secondary_y=True)
+            
+            fig.update_layout(
+                height=420,
+                title="Tendance hebdomadaire du trafic",
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            )
+            fig.update_xaxes(title_text="Semaine")
+            fig.update_yaxes(title_text="Débit total", secondary_y=False)
+            st.plotly_chart(fig, use_container_width=True)
 
 # ============================================================================
 # TAB 3: ALERTES & ANOMALIES
