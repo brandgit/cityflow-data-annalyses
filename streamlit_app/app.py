@@ -188,12 +188,21 @@ with col1:
 with col2:
     if top_compteurs and top_compteurs.get("data"):
         df_top = pd.DataFrame(top_compteurs["data"])
-        if not df_top.empty and "debit_moyen" in df_top.columns:
-            total_debit = int(df_top["debit_moyen"].sum())
+        # Chercher la colonne de débit disponible
+        debit_col = None
+        if "debit_total" in df_top.columns:
+            debit_col = "debit_total"
+        elif "dmja" in df_top.columns:
+            debit_col = "dmja"
+        elif "debit_moyen" in df_top.columns:
+            debit_col = "debit_moyen"
+        
+        if not df_top.empty and debit_col:
+            total_debit = int(df_top[debit_col].sum())
             st.metric(
-                label="🚴 Débit Total Moyen",
+                label="🚴 Débit Total",
                 value=f"{total_debit:,}",
-                delta="vélos/jour"
+                delta="vélos"
             )
         else:
             st.metric(label="🚴 Débit Total", value="N/A")
@@ -228,7 +237,7 @@ st.divider()
 # ONGLETS PRINCIPAUX
 # ============================================================================
 
-tab1, tab2, tab3, tab4 = st.tabs(["📊 Vue d'ensemble", "🚴 Flux Vélos", "🚨 Alertes", "🔗 Corrélations"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Vue d'ensemble", "🚴 Flux Vélos", "🚨 Alertes", "🔗 Corrélations", "📄 Rapports"])
 
 # ============================================================================
 # TAB 1: VUE D'ENSEMBLE
@@ -244,19 +253,32 @@ with tab1:
         if top_compteurs and top_compteurs.get("data"):
             df_top = pd.DataFrame(top_compteurs["data"])
             if not df_top.empty:
-                # Graphique en barres
-                fig = px.bar(
-                    df_top.head(10),
-                    x="debit_moyen",
-                    y="compteur_id",
-                    orientation="h",
-                    title="Top 10 Compteurs par Débit Moyen",
-                    labels={"debit_moyen": "Débit Moyen", "compteur_id": "Compteur"},
-                    color="debit_moyen",
-                    color_continuous_scale="Blues"
-                )
-                fig.update_layout(height=500, showlegend=False)
-                st.plotly_chart(fig, use_container_width=True)
+                # Déterminer la colonne de valeur disponible
+                value_col = None
+                if "debit_total" in df_top.columns:
+                    value_col = "debit_total"
+                elif "dmja" in df_top.columns:
+                    value_col = "dmja"
+                elif "debit_moyen" in df_top.columns:
+                    value_col = "debit_moyen"
+                
+                if value_col and "compteur_id" in df_top.columns:
+                    # Graphique en barres
+                    fig = px.bar(
+                        df_top.head(10),
+                        x=value_col,
+                        y="compteur_id",
+                        orientation="h",
+                        title="Top 10 Compteurs les plus actifs",
+                        labels={value_col: value_col.replace("_", " ").title(), "compteur_id": "Compteur"},
+                        color=value_col,
+                        color_continuous_scale="Blues"
+                    )
+                    fig.update_layout(height=500, showlegend=False)
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    with st.expander("📊 Voir les données"):
+                        st.dataframe(df_top.head(10), use_container_width=True)
             else:
                 st.info("Aucune donnée disponible")
         else:
@@ -268,18 +290,29 @@ with tab1:
         if heures_pointe and heures_pointe.get("data"):
             df_heures = pd.DataFrame(heures_pointe["data"])
             if not df_heures.empty and "heure" in df_heures.columns:
-                # Graphique en ligne
-                fig = px.line(
-                    df_heures,
-                    x="heure",
-                    y="debit_moyen",
-                    title="Distribution Horaire du Trafic",
-                    labels={"heure": "Heure", "debit_moyen": "Débit Moyen"},
-                    markers=True
-                )
-                fig.update_layout(height=500)
-                fig.update_traces(line_color="#1f77b4", line_width=3)
-                st.plotly_chart(fig, use_container_width=True)
+                # Trouver la colonne de débit
+                value_col = None
+                for col in ["debit_moyen", "debit_total", "comptage"]:
+                    if col in df_heures.columns:
+                        value_col = col
+                        break
+                
+                if value_col:
+                    # Graphique en ligne
+                    fig = px.line(
+                        df_heures,
+                        x="heure",
+                        y=value_col,
+                        title="Distribution Horaire du Trafic",
+                        labels={"heure": "Heure", value_col: value_col.replace("_", " ").title()},
+                        markers=True
+                    )
+                    fig.update_layout(height=500)
+                    fig.update_traces(line_color="#1f77b4", line_width=3)
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    with st.expander("📊 Voir les données"):
+                        st.dataframe(df_heures, use_container_width=True)
             else:
                 st.info("Aucune donnée disponible")
         else:
@@ -293,33 +326,50 @@ with tab1:
     if densite and densite.get("data"):
         df_densite = pd.DataFrame(densite["data"])
         if not df_densite.empty:
-            col1, col2 = st.columns(2)
+            # Trouver les colonnes appropriées
+            value_col = None
+            for col in ["debit_total", "comptage_total", "nombre_passages"]:
+                if col in df_densite.columns:
+                    value_col = col
+                    break
             
-            with col1:
-                # Graphique en camembert
-                fig = px.pie(
-                    df_densite,
-                    values="debit_total",
-                    names="arrondissement",
-                    title="Répartition du Trafic par Arrondissement",
-                    hole=0.4
-                )
-                fig.update_traces(textposition='inside', textinfo='percent+label')
-                st.plotly_chart(fig, use_container_width=True)
+            zone_col = None
+            for col in ["arrondissement", "zone", "secteur"]:
+                if col in df_densite.columns:
+                    zone_col = col
+                    break
             
-            with col2:
-                # Graphique en barres horizontales
-                fig = px.bar(
-                    df_densite.sort_values("debit_total", ascending=True),
-                    x="debit_total",
-                    y="arrondissement",
-                    orientation="h",
-                    title="Débit Total par Arrondissement",
-                    labels={"debit_total": "Débit Total", "arrondissement": "Arrondissement"},
-                    color="debit_total",
-                    color_continuous_scale="Viridis"
-                )
-                st.plotly_chart(fig, use_container_width=True)
+            if value_col and zone_col:
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # Graphique en camembert
+                    fig = px.pie(
+                        df_densite,
+                        values=value_col,
+                        names=zone_col,
+                        title="Répartition du Trafic par Zone",
+                        hole=0.4
+                    )
+                    fig.update_traces(textposition='inside', textinfo='percent+label')
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                with col2:
+                    # Graphique en barres horizontales
+                    fig = px.bar(
+                        df_densite.sort_values(value_col, ascending=True).tail(15),
+                        x=value_col,
+                        y=zone_col,
+                        orientation="h",
+                        title="Top 15 Zones par Trafic",
+                        labels={value_col: value_col.replace("_", " ").title(), zone_col: zone_col.title()},
+                        color=value_col,
+                        color_continuous_scale="Viridis"
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+            else:
+                with st.expander("📊 Voir les données"):
+                    st.dataframe(df_densite, use_container_width=True)
         else:
             st.info("Aucune donnée géographique disponible")
     else:
@@ -499,6 +549,67 @@ with tab4:
                     st.dataframe(df_corr, use_container_width=True)
             else:
                 st.info("Aucune donnée de corrélation")
+
+# ============================================================================
+# TAB 5: RAPPORTS
+# ============================================================================
+
+with tab5:
+    st.header("📄 Rapports Quotidiens")
+    
+    with st.spinner("Chargement des rapports..."):
+        reports_data = fetch_data_from_api(f"/reports/{selected_date}")
+    
+    if not reports_data or not reports_data.get("reports"):
+        st.warning("Aucun rapport disponible pour cette date")
+    else:
+        reports_list = reports_data.get("reports", [])
+        
+        # Créer des sous-onglets pour chaque type de rapport
+        if len(reports_list) > 0:
+            report_types = [r.get("report_type", "Inconnu") for r in reports_list]
+            report_tabs = st.tabs([f"📋 {rt.replace('_', ' ').title()}" for rt in report_types])
+            
+            for idx, (report_tab, report_item) in enumerate(zip(report_tabs, reports_list)):
+                with report_tab:
+                    report_type = report_item.get("report_type", "Inconnu")
+                    report_content = report_item.get("report", {})
+                    timestamp = report_item.get("timestamp", "N/A")
+                    
+                    st.subheader(f"📄 {report_type.replace('_', ' ').title()}")
+                    st.caption(f"Généré le : {timestamp}")
+                    
+                    # Afficher le contenu selon le type
+                    if isinstance(report_content, dict):
+                        # Afficher les métriques clés
+                        if "summary" in report_content or "metadata" in report_content:
+                            cols = st.columns(3)
+                            metrics_shown = 0
+                            for key, value in report_content.items():
+                                if isinstance(value, (int, float)) and metrics_shown < 3:
+                                    with cols[metrics_shown]:
+                                        st.metric(
+                                            label=key.replace("_", " ").title(),
+                                            value=f"{value:,.0f}" if isinstance(value, (int, float)) else value
+                                        )
+                                        metrics_shown += 1
+                        
+                        # Afficher le contenu complet dans un expander
+                        with st.expander("📊 Détails complets du rapport", expanded=True):
+                            # Formatter le JSON de manière lisible
+                            st.json(report_content)
+                    
+                    elif isinstance(report_content, list):
+                        # Si c'est une liste, l'afficher comme DataFrame
+                        df_report = pd.DataFrame(report_content)
+                        if not df_report.empty:
+                            st.dataframe(df_report, use_container_width=True)
+                        else:
+                            st.info("Rapport vide")
+                    
+                    else:
+                        # Affichage générique
+                        st.write(report_content)
 
 # Footer
 st.divider()
