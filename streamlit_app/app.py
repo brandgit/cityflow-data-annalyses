@@ -92,16 +92,33 @@ def get_reports(date: str) -> Optional[dict]:
 
 def safe_dataframe(data) -> pd.DataFrame:
     """Convertit des données en DataFrame de manière sécurisée."""
-    if data is None or data == []:
+    if data is None or data == [] or data == {}:
         return pd.DataFrame()
     
-    # Si c'est un dict scalaire, le mettre dans une liste
-    if isinstance(data, dict) and not isinstance(data, list):
-        try:
-            return pd.DataFrame([data])
-        except:
-            return pd.DataFrame()
+    # Si c'est un dict (pas une liste de dicts)
+    if isinstance(data, dict):
+        # Vérifier si c'est un dict avec des valeurs scalaires
+        if all(not isinstance(v, (list, dict)) for v in data.values()):
+            # C'est un dict scalaire (ex: {"ratio": 1.5, "semaine": 1000})
+            # Le convertir en une seule ligne
+            try:
+                return pd.DataFrame([data])
+            except:
+                return pd.DataFrame()
+        else:
+            # C'est un dict structuré (ex: {"lundi": [...], "mardi": [...]})
+            # Essayer de le convertir directement
+            try:
+                df = pd.DataFrame(data)
+                return df
+            except:
+                # Si échec, essayer de le reformater
+                try:
+                    return pd.DataFrame([data])
+                except:
+                    return pd.DataFrame()
     
+    # Si c'est une liste
     try:
         return pd.DataFrame(data)
     except:
