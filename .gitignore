@@ -56,3 +56,4 @@ data/*.csv
 # Données brutes et résultats
 bucket-cityflow-paris-s3-raw/
 output/
+logs/

@@ -29,8 +29,7 @@ fi
 echo "✅ Dépendances OK"
 echo ""
 
-# Créer le dossier logs si nécessaire
-mkdir -p logs
+# Pas de logs (économie d'espace disque)
 
 # Arrêter les processus existants
 echo "🛑 Arrêt des processus existants..."
@@ -40,10 +39,9 @@ sleep 2
 
 # Lancer l'API en arrière-plan
 echo "🚀 Lancement de l'API FastAPI (port 8000)..."
-nohup python -m api.main > logs/api.log 2>&1 &
+nohup python -m api.main > /dev/null 2>&1 &
 API_PID=$!
 echo "   ✓ API lancée (PID: $API_PID)"
-echo "   📝 Logs: logs/api.log"
 
 # Attendre que l'API démarre
 echo "⏳ Attente du démarrage de l'API..."
@@ -60,10 +58,9 @@ echo ""
 
 # Lancer Streamlit en arrière-plan
 echo "🎨 Lancement du Dashboard Streamlit (port 8501)..."
-nohup streamlit run streamlit_app/app.py --server.port 8501 --server.address 0.0.0.0 > logs/streamlit.log 2>&1 &
+nohup streamlit run streamlit_app/app.py --server.port 8501 --server.address 0.0.0.0 > /dev/null 2>&1 &
 STREAMLIT_PID=$!
 echo "   ✓ Dashboard lancé (PID: $STREAMLIT_PID)"
-echo "   📝 Logs: logs/streamlit.log"
 
 echo ""
 echo "=========================================="
@@ -77,10 +74,6 @@ echo ""
 echo "🎨 Dashboard Streamlit:"
 echo "   • Local:  http://localhost:8501"
 echo "   • Public: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo "IP_PUBLIQUE"):8501"
-echo ""
-echo "📝 Logs:"
-echo "   • API:        tail -f logs/api.log"
-echo "   • Dashboard:  tail -f logs/streamlit.log"
 echo ""
 echo "🛑 Pour arrêter les services:"
 echo "   ./stop_cityflow.sh"

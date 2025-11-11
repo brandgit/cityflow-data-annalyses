@@ -46,9 +46,6 @@ fi
 echo "✅ Dépendances OK"
 echo ""
 
-# Créer le dossier logs
-mkdir -p logs
-
 # ============================================================================
 # ÉTAPE 1 : TRAITEMENT DES DONNÉES
 # ============================================================================
@@ -59,10 +56,9 @@ echo "╚═══════════════════════�
 echo ""
 
 echo "🔄 Lancement du traitement des données (processors)..."
-echo "   📝 Logs: logs/processor.log"
 echo ""
 
-python -m processors.main 2>&1 | tee logs/processor.log
+python -m processors.main 2>&1
 
 PROCESSOR_EXIT_CODE=$?
 
@@ -71,7 +67,6 @@ if [ $PROCESSOR_EXIT_CODE -eq 0 ]; then
     echo "✅ Traitement terminé avec succès"
 else
     echo "❌ Erreur lors du traitement (code: $PROCESSOR_EXIT_CODE)"
-    echo "   📝 Consultez les logs: logs/processor.log"
     echo ""
     read -p "Continuer quand même ? (y/n) " -n 1 -r
     echo ""
@@ -101,11 +96,10 @@ sleep 2
 
 # Lancer l'API en arrière-plan
 echo "🚀 Lancement de l'API (port 8000)..."
-nohup python -m api.main > logs/api.log 2>&1 &
+nohup python -m api.main > /dev/null 2>&1 &
 API_PID=$!
 
 echo "   ✓ API lancée (PID: $API_PID)"
-echo "   📝 Logs: logs/api.log"
 
 # Attendre que l'API démarre
 echo "   ⏳ Vérification du démarrage..."
@@ -136,11 +130,10 @@ sleep 2
 
 # Lancer Streamlit en arrière-plan
 echo "🎨 Lancement du Dashboard (port 8501)..."
-nohup streamlit run streamlit_app/app.py --server.port 8501 --server.address 0.0.0.0 > logs/streamlit.log 2>&1 &
+nohup streamlit run streamlit_app/app.py --server.port 8501 --server.address 0.0.0.0 > /dev/null 2>&1 &
 STREAMLIT_PID=$!
 
 echo "   ✓ Dashboard lancé (PID: $STREAMLIT_PID)"
-echo "   📝 Logs: logs/streamlit.log"
 
 echo ""
 sleep 2
@@ -177,12 +170,6 @@ else
 fi
 
 echo ""
-echo "📝 Logs en temps réel :"
-echo "   • Traitement:  cat logs/processor.log"
-echo "   • API:         tail -f logs/api.log"
-echo "   • Dashboard:   tail -f logs/streamlit.log"
-echo ""
-
 echo "🛑 Pour arrêter les services :"
 echo "   ./stop_cityflow.sh"
 echo ""
