@@ -22,7 +22,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-API_URL = os.getenv("API_URL", "http://localhost:8000")
+# Configuration de l'URL de l'API
+# En production sur EC2, utiliser l'IP publique
+# En local, utiliser localhost
+API_URL = os.getenv("API_URL", "http://35.180.67.164:8000")
 
 # CSS personnalisé
 st.markdown("""
