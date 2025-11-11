@@ -31,3 +31,7 @@ pymongo>=4.5.0
 # Bibliothèques pour les variables d'environnement
 python-dotenv>=1.0.0
 
+# Bibliothèques pour l'API
+fastapi>=0.110.0
+uvicorn[standard]>=0.25.0
+
