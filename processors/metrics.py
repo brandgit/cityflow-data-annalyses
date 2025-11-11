@@ -229,11 +229,6 @@ def calculate_compteurs_faible_activite(df: pd.DataFrame, seuil_pct: float = 20.
     faible_activite["mediane_dmja"] = mediane
     faible_activite["seuil_pct"] = seuil_pct
     
-    # Enrichir avec les coordonnées GPS si disponibles
-    if "latitude" in df.columns and "longitude" in df.columns:
-        coords = df[["compteur_id", "latitude", "longitude"]].drop_duplicates("compteur_id")
-        faible_activite = faible_activite.merge(coords, on="compteur_id", how="left")
-    
     return faible_activite
 
 
@@ -680,5 +675,4 @@ def calculate_all_metrics(
     if df_qualite is not None and not df_qualite.empty:
         metrics["qualite_service"] = calculate_qualite_service_aggregate(df_qualite)
     
-    return metrics
-
+    return metri
