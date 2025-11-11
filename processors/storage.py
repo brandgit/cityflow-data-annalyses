@@ -71,7 +71,8 @@ class InputReader:
         if self._s3_client is None:
             self._s3_client = boto3.client('s3', region_name=self.config.aws_region)
         
-        s3_prefix = f"{self.config.s3_raw_prefix}/{prefix}"
+        # Le préfixe contient déjà "raw/" donc on ne l'ajoute pas
+        s3_prefix = prefix
         
         try:
             response = self._s3_client.list_objects_v2(
