@@ -90,6 +90,23 @@ def get_reports(date: str) -> Optional[dict]:
     except:
         return None
 
+def safe_dataframe(data) -> pd.DataFrame:
+    """Convertit des données en DataFrame de manière sécurisée."""
+    if data is None or data == []:
+        return pd.DataFrame()
+    
+    # Si c'est un dict scalaire, le mettre dans une liste
+    if isinstance(data, dict) and not isinstance(data, list):
+        try:
+            return pd.DataFrame([data])
+        except:
+            return pd.DataFrame()
+    
+    try:
+        return pd.DataFrame(data)
+    except:
+        return pd.DataFrame()
+
 # ============================================================================
 # HEADER
 # ============================================================================
@@ -158,7 +175,7 @@ with col3:
     st.metric("🔴 Congestions", congestions, delta="zones")
 
 with col4:
-    df_top = pd.DataFrame(metrics.get("top_compteurs", []))
+    df_top = safe_dataframe(metrics.get("top_compteurs", []))
     if not df_top.empty:
         total_compteurs = len(df_top)
         st.metric("🚴 Compteurs actifs", total_compteurs)
@@ -187,7 +204,7 @@ with tab1:
     st.header("📊 Vue d'Ensemble Globale")
     
     # Top Compteurs résumé
-    df_top = pd.DataFrame(metrics.get("top_compteurs", []))
+    df_top = safe_dataframe(metrics.get("top_compteurs", []))
     if not df_top.empty:
         st.subheader("🏆 Top 20 Compteurs les Plus Actifs")
         
@@ -214,7 +231,7 @@ with tab1:
     st.divider()
     
     # Heures de pointe
-    df_heures = pd.DataFrame(metrics.get("heures_pointe", []))
+    df_heures = safe_dataframe(metrics.get("heures_pointe", []))
     if not df_heures.empty and "heure" in df_heures.columns:
         st.subheader("⏰ Profil Horaire du Trafic")
         
@@ -248,7 +265,7 @@ with tab1:
     st.divider()
     
     # Débit journalier (heatmap)
-    df_debit = pd.DataFrame(metrics.get("debit_journalier", []))
+    df_debit = safe_dataframe(metrics.get("debit_journalier", []))
     if not df_debit.empty and "compteur_id" in df_debit.columns and "debit_journalier" in df_debit.columns:
         st.subheader("📅 Débit Journalier par Compteur")
         
@@ -290,7 +307,7 @@ with tab1:
     st.divider()
     
     # Densité par zone
-    df_densite = pd.DataFrame(metrics.get("densite_par_zone", []))
+    df_densite = safe_dataframe(metrics.get("densite_par_zone", []))
     if not df_densite.empty:
         st.subheader("🗺️ Répartition Géographique")
         
@@ -340,19 +357,19 @@ with tab1:
     df_map = None
     
     # Chercher dans densite_par_zone
-    df_densite_map = pd.DataFrame(metrics.get("densite_par_zone", []))
+    df_densite_map = safe_dataframe(metrics.get("densite_par_zone", []))
     if not df_densite_map.empty and "latitude" in df_densite_map.columns and "longitude" in df_densite_map.columns:
         df_map = df_densite_map.copy()
     
     # Sinon chercher dans top_compteurs
     if df_map is None or df_map.empty:
-        df_top_map = pd.DataFrame(metrics.get("top_compteurs", []))
+        df_top_map = safe_dataframe(metrics.get("top_compteurs", []))
         if not df_top_map.empty and "latitude" in df_top_map.columns and "longitude" in df_top_map.columns:
             df_map = df_top_map.copy()
     
     # Sinon chercher dans debit_journalier
     if df_map is None or df_map.empty:
-        df_debit_map = pd.DataFrame(metrics.get("debit_journalier", []))
+        df_debit_map = safe_dataframe(metrics.get("debit_journalier", []))
         if not df_debit_map.empty and "latitude" in df_debit_map.columns and "longitude" in df_debit_map.columns:
             df_map = df_debit_map.copy()
     
@@ -443,7 +460,7 @@ with tab2:
     st.header("🚴 Analyse Détaillée des Flux Vélos")
     
     # Débit journalier détaillé
-    df_debit = pd.DataFrame(metrics.get("debit_journalier", []))
+    df_debit = safe_dataframe(metrics.get("debit_journalier", []))
     if not df_debit.empty:
         st.subheader("📅 Débit Journalier par Compteur")
         
@@ -504,7 +521,7 @@ with tab2:
     st.divider()
     
     # DMJA (Débit Moyen Journalier Annuel)
-    df_dmja = pd.DataFrame(metrics.get("dmja", []))
+    df_dmja = safe_dataframe(metrics.get("dmja", []))
     if not df_dmja.empty:
         st.subheader("📈 DMJA (Débit Moyen Journalier Annuel)")
         
@@ -530,7 +547,7 @@ with tab2:
     col1, col2 = st.columns(2)
     
     with col1:
-        df_defaillants = pd.DataFrame(metrics.get("compteurs_defaillants", []))
+        df_defaillants = safe_dataframe(metrics.get("compteurs_defaillants", []))
         if not df_defaillants.empty:
             st.subheader("⚠️ Compteurs Défaillants")
             st.metric("Nombre", len(df_defaillants))
@@ -540,7 +557,7 @@ with tab2:
             st.success("✅ Aucun compteur défaillant")
     
     with col2:
-        df_faible = pd.DataFrame(metrics.get("compteurs_faible_activite", []))
+        df_faible = safe_dataframe(metrics.get("compteurs_faible_activite", []))
         if not df_faible.empty:
             st.subheader("📉 Faible Activité")
             st.metric("Nombre", len(df_faible))
@@ -552,7 +569,7 @@ with tab2:
     st.divider()
     
     # Ratio weekend/semaine
-    df_ratio = pd.DataFrame(metrics.get("ratio_weekend_semaine", []))
+    df_ratio = safe_dataframe(metrics.get("ratio_weekend_semaine", []))
     if not df_ratio.empty:
         st.subheader("📅 Ratio Weekend / Semaine")
         
@@ -576,7 +593,7 @@ with tab2:
     st.divider()
     
     # Débit horaire
-    df_horaire = pd.DataFrame(metrics.get("debit_horaire", []))
+    df_horaire = safe_dataframe(metrics.get("debit_horaire", []))
     if not df_horaire.empty:
         st.subheader("⏱️ Débit Horaire Détaillé")
         
@@ -608,7 +625,7 @@ with tab2:
     st.divider()
     
     # Profil jour type
-    df_profil = pd.DataFrame(metrics.get("profil_jour_type", []))
+    df_profil = safe_dataframe(metrics.get("profil_jour_type", []))
     if not df_profil.empty:
         st.subheader("📅 Profil Jour Type")
         
@@ -634,7 +651,7 @@ with tab2:
     st.divider()
     
     # Taux de disponibilité
-    df_dispo = pd.DataFrame(metrics.get("taux_disponibilite", []))
+    df_dispo = safe_dataframe(metrics.get("taux_disponibilite", []))
     if not df_dispo.empty:
         st.subheader("✅ Taux de Disponibilité des Compteurs")
         
@@ -663,7 +680,7 @@ with tab2:
     st.divider()
     
     # Corridors cyclables
-    df_corridors = pd.DataFrame(metrics.get("corridors_cyclables", []))
+    df_corridors = safe_dataframe(metrics.get("corridors_cyclables", []))
     if not df_corridors.empty:
         st.subheader("🛣️ Corridors Cyclables Principaux")
         
@@ -691,7 +708,7 @@ with tab2:
     st.divider()
     
     # Évolution hebdomadaire
-    df_hebdo = pd.DataFrame(metrics.get("evolution_hebdomadaire", []))
+    df_hebdo = safe_dataframe(metrics.get("evolution_hebdomadaire", []))
     if not df_hebdo.empty:
         st.subheader("📊 Évolution Hebdomadaire")
         
@@ -728,7 +745,7 @@ with tab3:
     st.header("🚨 Alertes et Détection d'Anomalies")
     
     # Anomalies
-    df_anomalies = pd.DataFrame(metrics.get("anomalies", []))
+    df_anomalies = safe_dataframe(metrics.get("anomalies", []))
     if not df_anomalies.empty:
         st.subheader("🔍 Anomalies Détectées")
         
@@ -769,7 +786,7 @@ with tab3:
     st.divider()
     
     # Congestions
-    df_congestion = pd.DataFrame(metrics.get("congestion_cyclable", []))
+    df_congestion = safe_dataframe(metrics.get("congestion_cyclable", []))
     if not df_congestion.empty:
         st.subheader("🔴 Zones de Congestion")
         
@@ -805,7 +822,7 @@ with tab3:
     st.divider()
     
     # Chantiers actifs
-    df_chantiers = pd.DataFrame(metrics.get("chantiers_actifs", []))
+    df_chantiers = safe_dataframe(metrics.get("chantiers_actifs", []))
     if not df_chantiers.empty:
         st.subheader("🚧 Chantiers Actifs")
         
@@ -838,7 +855,7 @@ with tab3:
     st.divider()
     
     # Score criticité chantiers
-    df_criticite = pd.DataFrame(metrics.get("score_criticite_chantiers", []))
+    df_criticite = safe_dataframe(metrics.get("score_criticite_chantiers", []))
     if not df_criticite.empty:
         st.subheader("⚠️ Criticité des Chantiers")
         
@@ -876,7 +893,7 @@ with tab3:
     st.divider()
     
     # Qualité de service
-    df_qualite = pd.DataFrame(metrics.get("qualite_service", []))
+    df_qualite = safe_dataframe(metrics.get("qualite_service", []))
     if not df_qualite.empty:
         st.subheader("✨ Qualité de Service")
         
@@ -928,7 +945,7 @@ with tab4:
             st.subheader(f"🔗 {corr_name.replace('_', ' ').title()}")
             
             if isinstance(corr_data, list) and len(corr_data) > 0:
-                df_corr = pd.DataFrame(corr_data)
+                df_corr = safe_dataframe(corr_data)
                 
                 # Afficher selon les colonnes disponibles
                 if "correlation" in df_corr.columns:
@@ -999,7 +1016,7 @@ with tab5:
                     st.json(report_content)
                 
                 elif isinstance(report_content, list):
-                    df = pd.DataFrame(report_content)
+                    df = safe_dataframe(report_content)
                     if not df.empty:
                         st.dataframe(df, use_container_width=True)
                 else:
