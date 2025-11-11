@@ -443,46 +443,102 @@ with tab1:
                 break
         
         if value_col and len(df_map) > 0:
-            # Limiter à 200 points pour la performance
+            # Limiter à 200 points pour garder de bonnes performances
             df_map = df_map.nlargest(200, value_col) if len(df_map) > 200 else df_map
-            
-            # Option 1: PyDeck (3D, plus impressionnant)
+
+            # Normaliser les valeurs pour rayon / couleur / hauteur
+            min_val = df_map[value_col].min()
+            max_val = df_map[value_col].max()
+            amplitude = max(max_val - min_val, 1)
+            df_map["value_norm"] = ((df_map[value_col] - min_val) / amplitude).fillna(0)
+            df_map["height"] = (df_map["value_norm"] * 1200).clip(lower=0).fillna(0)
+            df_map["radius"] = (df_map["value_norm"] * 120 + 30).fillna(30)
+
+            st.markdown("**Type de visualisation :**")
+            viz_type = st.radio(
+                "Type de rendu cartographique",
+                ["Points 3D", "Points 2D", "Heatmap"],
+                horizontal=True,
+                label_visibility="collapsed",
+            )
+
             try:
-                # Normaliser les valeurs pour la hauteur
-                max_val = df_map[value_col].max()
-                df_map["height"] = (df_map[value_col] / max_val * 1000).fillna(0)
-                
-                layer = pdk.Layer(
-                    "HexagonLayer",
-                    df_map,
-                    get_position=["longitude", "latitude"],
-                    auto_highlight=True,
-                    elevation_scale=50,
-                    pickable=True,
-                    elevation_range=[0, 1000],
-                    extruded=True,
-                    coverage=0.8,
-                    radius=100,
-                    get_fill_color="[255, (1 - height / 1000) * 255, 0]",
-                )
-                
                 view_state = pdk.ViewState(
-                    longitude=2.3522,
-                    latitude=48.8566,
+                    longitude=float(df_map["longitude"].mean()),
+                    latitude=float(df_map["latitude"].mean()),
                     zoom=11,
-                    pitch=50,
-                    bearing=0
+                    pitch=45 if viz_type == "Points 3D" else 0,
+                    bearing=0,
                 )
-                
+
+                if viz_type == "Points 3D":
+                    layers = [
+                        pdk.Layer(
+                            "ColumnLayer",
+                            data=df_map,
+                            get_position=["longitude", "latitude"],
+                            get_elevation="height",
+                            elevation_scale=1,
+                            radius=60,
+                            get_fill_color="[255, (1 - value_norm) * 180, 40, 200]",
+                            pickable=True,
+                            auto_highlight=True,
+                        )
+                    ]
+                    legend = (
+                        "La hauteur et la couleur des colonnes reflètent le niveau de trafic ("
+                        f"{value_col})."
+                    )
+
+                elif viz_type == "Points 2D":
+                    layers = [
+                        pdk.Layer(
+                            "ScatterplotLayer",
+                            data=df_map,
+                            get_position=["longitude", "latitude"],
+                            get_radius="radius",
+                            radius_scale=2,
+                            radius_min_pixels=4,
+                            radius_max_pixels=40,
+                            get_fill_color="[255, (1 - value_norm) * 150, 20, 220]",
+                            pickable=True,
+                            auto_highlight=True,
+                        )
+                    ]
+                    legend = (
+                        "Chaque cercle représente un compteur. Taille et couleur proportionnelles à "
+                        f"{value_col}."
+                    )
+
+                else:  # Heatmap
+                    layers = [
+                        pdk.Layer(
+                            "HeatmapLayer",
+                            data=df_map,
+                            get_position=["longitude", "latitude"],
+                            aggregation=pdk.types.String("MEAN"),
+                            get_weight=value_col,
+                            radius_pixels=40,
+                        )
+                    ]
+                    legend = (
+                        "La chaleur met en évidence les zones où le niveau de trafic est le plus élevé."
+                    )
+
                 deck = pdk.Deck(
-                    layers=[layer],
+                    layers=layers,
                     initial_view_state=view_state,
-                    tooltip={"text": f"Compteur\nDébit: {{{value_col}}}"}
+                    tooltip={
+                        "html": "<b>Compteur :</b> {compteur_id}<br/>"
+                        f"<b>{value_col} :</b> {{{value_col}}}",
+                        "style": {"backgroundColor": "#0f2537", "color": "#FFFFFF"},
+                    },
                 )
-                
                 st.pydeck_chart(deck)
-            except Exception as e:
-                # Fallback: Plotly Mapbox (2D, plus simple)
+                st.caption(f"ℹ️ {legend}")
+
+            except Exception:
+                # Fallback Plotly Mapbox
                 fig = px.scatter_mapbox(
                     df_map,
                     lat="latitude",
@@ -492,17 +548,15 @@ with tab1:
                     hover_name="compteur_id" if "compteur_id" in df_map.columns else None,
                     hover_data=[value_col],
                     color_continuous_scale="RdYlGn",
-                    size_max=20,
+                    size_max=30,
                     zoom=11,
                     height=600,
-                    title="Répartition Géographique des Compteurs Vélo"
+                    title="Répartition Géographique des Compteurs Vélo",
                 )
-                
                 fig.update_layout(
-                    mapbox_style="open-street-map",
+                    mapbox_style="carto-darkmatter",
                     mapbox=dict(center=dict(lat=48.8566, lon=2.3522)),
                 )
-                
                 st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("📍 Coordonnées GPS disponibles mais sans données de débit")
