@@ -11,6 +11,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import pydeck as pdk
 import os
 
 # Configuration
@@ -170,21 +171,22 @@ st.divider()
 # ONGLETS PRINCIPAUX
 # ============================================================================
 
-tab1, tab2, tab3, tab4 = st.tabs([
-    "📊 Analyse Flux", 
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "📊 Vue d'Ensemble",
+    "🚴 Flux Vélos", 
     "🚨 Alertes & Anomalies",
     "🔗 Corrélations",
     "📄 Rapports"
 ])
 
 # ============================================================================
-# TAB 1: ANALYSE DES FLUX
+# TAB 1: VUE D'ENSEMBLE
 # ============================================================================
 
 with tab1:
-    st.header("📊 Analyse des Flux Cyclables")
+    st.header("📊 Vue d'Ensemble Globale")
     
-    # Top Compteurs
+    # Top Compteurs résumé
     df_top = pd.DataFrame(metrics.get("top_compteurs", []))
     if not df_top.empty:
         st.subheader("🏆 Top 20 Compteurs les Plus Actifs")
@@ -328,12 +330,401 @@ with tab1:
                     color_continuous_scale="Blues"
                 )
                 st.plotly_chart(fig, use_container_width=True)
+    
+    st.divider()
+    
+    # CARTOGRAPHIE
+    st.subheader("🗺️ Cartographie Interactive - Compteurs Vélo Paris")
+    
+    # Essayer de récupérer les données avec coordonnées
+    df_map = None
+    
+    # Chercher dans densite_par_zone
+    df_densite_map = pd.DataFrame(metrics.get("densite_par_zone", []))
+    if not df_densite_map.empty and "latitude" in df_densite_map.columns and "longitude" in df_densite_map.columns:
+        df_map = df_densite_map.copy()
+    
+    # Sinon chercher dans top_compteurs
+    if df_map is None or df_map.empty:
+        df_top_map = pd.DataFrame(metrics.get("top_compteurs", []))
+        if not df_top_map.empty and "latitude" in df_top_map.columns and "longitude" in df_top_map.columns:
+            df_map = df_top_map.copy()
+    
+    # Sinon chercher dans debit_journalier
+    if df_map is None or df_map.empty:
+        df_debit_map = pd.DataFrame(metrics.get("debit_journalier", []))
+        if not df_debit_map.empty and "latitude" in df_debit_map.columns and "longitude" in df_debit_map.columns:
+            df_map = df_debit_map.copy()
+    
+    if df_map is not None and not df_map.empty:
+        # Nettoyer les données
+        df_map = df_map.dropna(subset=["latitude", "longitude"])
+        
+        # Trouver la colonne de valeur pour la taille/couleur
+        value_col = None
+        for col in ["debit_total", "dmja", "debit_journalier", "debit_moyen"]:
+            if col in df_map.columns:
+                value_col = col
+                break
+        
+        if value_col and len(df_map) > 0:
+            # Limiter à 200 points pour la performance
+            df_map = df_map.nlargest(200, value_col) if len(df_map) > 200 else df_map
+            
+            # Option 1: PyDeck (3D, plus impressionnant)
+            try:
+                # Normaliser les valeurs pour la hauteur
+                max_val = df_map[value_col].max()
+                df_map["height"] = (df_map[value_col] / max_val * 1000).fillna(0)
+                
+                layer = pdk.Layer(
+                    "HexagonLayer",
+                    df_map,
+                    get_position=["longitude", "latitude"],
+                    auto_highlight=True,
+                    elevation_scale=50,
+                    pickable=True,
+                    elevation_range=[0, 1000],
+                    extruded=True,
+                    coverage=0.8,
+                    radius=100,
+                    get_fill_color="[255, (1 - height / 1000) * 255, 0]",
+                )
+                
+                view_state = pdk.ViewState(
+                    longitude=2.3522,
+                    latitude=48.8566,
+                    zoom=11,
+                    pitch=50,
+                    bearing=0
+                )
+                
+                deck = pdk.Deck(
+                    layers=[layer],
+                    initial_view_state=view_state,
+                    tooltip={"text": f"Compteur\nDébit: {{{value_col}}}"}
+                )
+                
+                st.pydeck_chart(deck)
+            except Exception as e:
+                # Fallback: Plotly Mapbox (2D, plus simple)
+                fig = px.scatter_mapbox(
+                    df_map,
+                    lat="latitude",
+                    lon="longitude",
+                    size=value_col,
+                    color=value_col,
+                    hover_name="compteur_id" if "compteur_id" in df_map.columns else None,
+                    hover_data=[value_col],
+                    color_continuous_scale="RdYlGn",
+                    size_max=20,
+                    zoom=11,
+                    height=600,
+                    title="Répartition Géographique des Compteurs Vélo"
+                )
+                
+                fig.update_layout(
+                    mapbox_style="open-street-map",
+                    mapbox=dict(center=dict(lat=48.8566, lon=2.3522)),
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("📍 Coordonnées GPS disponibles mais sans données de débit")
+    else:
+        st.warning("📍 Pas de coordonnées GPS disponibles dans les données")
+        st.caption("Les données de compteurs doivent contenir les colonnes 'latitude' et 'longitude'")
 
 # ============================================================================
-# TAB 2: ALERTES & ANOMALIES
+# TAB 2: FLUX VÉLOS DÉTAILLÉ
 # ============================================================================
 
 with tab2:
+    st.header("🚴 Analyse Détaillée des Flux Vélos")
+    
+    # Débit journalier détaillé
+    df_debit = pd.DataFrame(metrics.get("debit_journalier", []))
+    if not df_debit.empty:
+        st.subheader("📅 Débit Journalier par Compteur")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if "debit_journalier" in df_debit.columns:
+                st.metric("Débit Moyen", f"{df_debit['debit_journalier'].mean():,.0f}")
+        with col2:
+            if "debit_journalier" in df_debit.columns:
+                st.metric("Débit Max", f"{df_debit['debit_journalier'].max():,.0f}")
+        with col3:
+            if "compteur_id" in df_debit.columns:
+                st.metric("Compteurs Actifs", len(df_debit["compteur_id"].unique()))
+        
+        # Heatmap ou graphique selon données
+        if "compteur_id" in df_debit.columns and "debit_journalier" in df_debit.columns:
+            top_20 = df_debit.groupby("compteur_id")["debit_journalier"].sum().nlargest(20).index
+            df_filtered = df_debit[df_debit["compteur_id"].isin(top_20)]
+            
+            if "date" in df_filtered.columns:
+                # Heatmap si dates disponibles
+                pivot = df_filtered.pivot_table(
+                    values="debit_journalier",
+                    index="compteur_id",
+                    columns="date",
+                    aggfunc="sum"
+                )
+                
+                fig = px.imshow(
+                    pivot,
+                    labels=dict(x="Date", y="Compteur", color="Débit"),
+                    title="Heatmap du Débit Journalier (Top 20 Compteurs)",
+                    color_continuous_scale="RdYlGn",
+                    aspect="auto",
+                    height=600
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                # Barres sinon
+                df_sum = df_filtered.groupby("compteur_id")["debit_journalier"].sum().reset_index()
+                fig = px.bar(
+                    df_sum.sort_values("debit_journalier", ascending=True),
+                    y="compteur_id",
+                    x="debit_journalier",
+                    orientation="h",
+                    title="Débit Journalier Total (Top 20 Compteurs)",
+                    color="debit_journalier",
+                    color_continuous_scale="Blues",
+                    height=600
+                )
+                st.plotly_chart(fig, use_container_width=True)
+        
+        # Statistiques détaillées
+        with st.expander("📊 Statistiques Détaillées"):
+            st.dataframe(df_debit.describe(), use_container_width=True)
+    
+    st.divider()
+    
+    # DMJA (Débit Moyen Journalier Annuel)
+    df_dmja = pd.DataFrame(metrics.get("dmja", []))
+    if not df_dmja.empty:
+        st.subheader("📈 DMJA (Débit Moyen Journalier Annuel)")
+        
+        if "dmja" in df_dmja.columns and "compteur_id" in df_dmja.columns:
+            top_15 = df_dmja.nlargest(15, "dmja")
+            
+            fig = px.bar(
+                top_15.sort_values("dmja", ascending=True),
+                y="compteur_id",
+                x="dmja",
+                orientation="h",
+                title="Top 15 Compteurs par DMJA",
+                labels={"dmja": "DMJA", "compteur_id": "Compteur"},
+                color="dmja",
+                color_continuous_scale="Greens",
+                height=500
+            )
+            st.plotly_chart(fig, use_container_width=True)
+    
+    st.divider()
+    
+    # Compteurs défaillants et faible activité
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        df_defaillants = pd.DataFrame(metrics.get("compteurs_defaillants", []))
+        if not df_defaillants.empty:
+            st.subheader("⚠️ Compteurs Défaillants")
+            st.metric("Nombre", len(df_defaillants))
+            with st.expander("Voir la liste"):
+                st.dataframe(df_defaillants, use_container_width=True)
+        else:
+            st.success("✅ Aucun compteur défaillant")
+    
+    with col2:
+        df_faible = pd.DataFrame(metrics.get("compteurs_faible_activite", []))
+        if not df_faible.empty:
+            st.subheader("📉 Faible Activité")
+            st.metric("Nombre", len(df_faible))
+            with st.expander("Voir la liste"):
+                st.dataframe(df_faible, use_container_width=True)
+        else:
+            st.success("✅ Tous les compteurs sont actifs")
+    
+    st.divider()
+    
+    # Ratio weekend/semaine
+    df_ratio = pd.DataFrame(metrics.get("ratio_weekend_semaine", []))
+    if not df_ratio.empty:
+        st.subheader("📅 Ratio Weekend / Semaine")
+        
+        if "ratio" in df_ratio.columns and "compteur_id" in df_ratio.columns:
+            fig = px.scatter(
+                df_ratio.head(30),
+                x="compteur_id",
+                y="ratio",
+                size="ratio",
+                color="ratio",
+                title="Ratio Weekend/Semaine par Compteur",
+                labels={"ratio": "Ratio", "compteur_id": "Compteur"},
+                color_continuous_scale="RdYlGn",
+                height=400
+            )
+            fig.add_hline(y=1, line_dash="dash", line_color="red", annotation_text="Équilibre")
+            st.plotly_chart(fig, use_container_width=True)
+            
+            st.caption("Ratio > 1 : Plus d'activité le weekend | Ratio < 1 : Plus d'activité en semaine")
+    
+    st.divider()
+    
+    # Débit horaire
+    df_horaire = pd.DataFrame(metrics.get("debit_horaire", []))
+    if not df_horaire.empty:
+        st.subheader("⏱️ Débit Horaire Détaillé")
+        
+        if "heure" in df_horaire.columns:
+            value_col = None
+            for col in ["debit_horaire", "debit_moyen", "comptage"]:
+                if col in df_horaire.columns:
+                    value_col = col
+                    break
+            
+            if value_col:
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    x=df_horaire["heure"],
+                    y=df_horaire[value_col],
+                    mode='lines+markers',
+                    line=dict(color='#2ca02c', width=2),
+                    marker=dict(size=6),
+                    fill='tonexty'
+                ))
+                fig.update_layout(
+                    title="Évolution Horaire du Trafic",
+                    xaxis_title="Heure",
+                    yaxis_title=value_col.replace("_", " ").title(),
+                    height=350
+                )
+                st.plotly_chart(fig, use_container_width=True)
+    
+    st.divider()
+    
+    # Profil jour type
+    df_profil = pd.DataFrame(metrics.get("profil_jour_type", []))
+    if not df_profil.empty:
+        st.subheader("📅 Profil Jour Type")
+        
+        if "jour_type" in df_profil.columns:
+            value_col = None
+            for col in ["debit_moyen", "comptage_moyen", "trafic"]:
+                if col in df_profil.columns:
+                    value_col = col
+                    break
+            
+            if value_col:
+                fig = px.bar(
+                    df_profil,
+                    x="jour_type",
+                    y=value_col,
+                    title="Comparaison des Profils de Circulation",
+                    labels={"jour_type": "Type de Jour", value_col: value_col.replace("_", " ").title()},
+                    color=value_col,
+                    color_continuous_scale="Blues"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+    
+    st.divider()
+    
+    # Taux de disponibilité
+    df_dispo = pd.DataFrame(metrics.get("taux_disponibilite", []))
+    if not df_dispo.empty:
+        st.subheader("✅ Taux de Disponibilité des Compteurs")
+        
+        if "taux_disponibilite" in df_dispo.columns:
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                avg_dispo = df_dispo["taux_disponibilite"].mean()
+                st.metric("Disponibilité Moyenne", f"{avg_dispo:.1f}%")
+            
+            with col2:
+                compteurs_ok = len(df_dispo[df_dispo["taux_disponibilite"] >= 90])
+                st.metric("Compteurs > 90%", compteurs_ok)
+            
+            if "compteur_id" in df_dispo.columns:
+                fig = px.histogram(
+                    df_dispo,
+                    x="taux_disponibilite",
+                    nbins=20,
+                    title="Distribution du Taux de Disponibilité",
+                    labels={"taux_disponibilite": "Taux de Disponibilité (%)"},
+                    color_discrete_sequence=["#2ca02c"]
+                )
+                st.plotly_chart(fig, use_container_width=True)
+    
+    st.divider()
+    
+    # Corridors cyclables
+    df_corridors = pd.DataFrame(metrics.get("corridors_cyclables", []))
+    if not df_corridors.empty:
+        st.subheader("🛣️ Corridors Cyclables Principaux")
+        
+        if "corridor" in df_corridors.columns or "axe" in df_corridors.columns:
+            corridor_col = "corridor" if "corridor" in df_corridors.columns else "axe"
+            value_col = None
+            for col in ["trafic_total", "debit_moyen", "frequence"]:
+                if col in df_corridors.columns:
+                    value_col = col
+                    break
+            
+            if value_col:
+                top_10 = df_corridors.nlargest(10, value_col)
+                fig = px.bar(
+                    top_10.sort_values(value_col, ascending=True),
+                    y=corridor_col,
+                    x=value_col,
+                    orientation="h",
+                    title="Top 10 Corridors Cyclables",
+                    color=value_col,
+                    color_continuous_scale="Greens"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+    
+    st.divider()
+    
+    # Évolution hebdomadaire
+    df_hebdo = pd.DataFrame(metrics.get("evolution_hebdomadaire", []))
+    if not df_hebdo.empty:
+        st.subheader("📊 Évolution Hebdomadaire")
+        
+        if "semaine" in df_hebdo.columns or "jour" in df_hebdo.columns:
+            x_col = "semaine" if "semaine" in df_hebdo.columns else "jour"
+            value_col = None
+            for col in ["trafic_total", "debit_moyen", "comptage"]:
+                if col in df_hebdo.columns:
+                    value_col = col
+                    break
+            
+            if value_col:
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    x=df_hebdo[x_col],
+                    y=df_hebdo[value_col],
+                    mode='lines+markers',
+                    line=dict(color='#ff7f0e', width=3),
+                    marker=dict(size=8)
+                ))
+                fig.update_layout(
+                    title="Tendance Hebdomadaire du Trafic",
+                    xaxis_title=x_col.title(),
+                    yaxis_title=value_col.replace("_", " ").title(),
+                    height=400
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+# ============================================================================
+# TAB 3: ALERTES & ANOMALIES
+# ============================================================================
+
+with tab3:
     st.header("🚨 Alertes et Détection d'Anomalies")
     
     # Anomalies
@@ -410,12 +801,121 @@ with tab2:
             st.dataframe(df_congestion, use_container_width=True)
     else:
         st.success("✅ Aucune congestion détectée")
+    
+    st.divider()
+    
+    # Chantiers actifs
+    df_chantiers = pd.DataFrame(metrics.get("chantiers_actifs", []))
+    if not df_chantiers.empty:
+        st.subheader("🚧 Chantiers Actifs")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.metric("Nombre de Chantiers", len(df_chantiers))
+        
+        with col2:
+            if "arrondissement" in df_chantiers.columns:
+                most_impacted = df_chantiers["arrondissement"].mode()[0] if not df_chantiers["arrondissement"].mode().empty else "N/A"
+                st.metric("Arrondissement le + impacté", most_impacted)
+        
+        if "arrondissement" in df_chantiers.columns:
+            chantiers_by_arr = df_chantiers["arrondissement"].value_counts().head(10)
+            fig = px.bar(
+                x=chantiers_by_arr.values,
+                y=chantiers_by_arr.index,
+                orientation="h",
+                title="Chantiers par Arrondissement",
+                labels={"x": "Nombre de Chantiers", "y": "Arrondissement"},
+                color=chantiers_by_arr.values,
+                color_continuous_scale="Oranges"
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with st.expander("📋 Liste des chantiers"):
+            st.dataframe(df_chantiers, use_container_width=True)
+    
+    st.divider()
+    
+    # Score criticité chantiers
+    df_criticite = pd.DataFrame(metrics.get("score_criticite_chantiers", []))
+    if not df_criticite.empty:
+        st.subheader("⚠️ Criticité des Chantiers")
+        
+        if "score_criticite" in df_criticite.columns:
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                avg_score = df_criticite["score_criticite"].mean()
+                st.metric("Score Moyen", f"{avg_score:.1f}")
+            
+            with col2:
+                max_score = df_criticite["score_criticite"].max()
+                st.metric("Score Max", f"{max_score:.1f}")
+            
+            with col3:
+                high_crit = len(df_criticite[df_criticite["score_criticite"] >= 70])
+                st.metric("Chantiers Critiques", high_crit)
+            
+            # Top 10 chantiers critiques
+            if "chantier_id" in df_criticite.columns or "arrondissement" in df_criticite.columns:
+                id_col = "chantier_id" if "chantier_id" in df_criticite.columns else "arrondissement"
+                top_10 = df_criticite.nlargest(10, "score_criticite")
+                
+                fig = px.bar(
+                    top_10.sort_values("score_criticite", ascending=True),
+                    y=id_col,
+                    x="score_criticite",
+                    orientation="h",
+                    title="Top 10 Chantiers les Plus Critiques",
+                    color="score_criticite",
+                    color_continuous_scale="Reds"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+    
+    st.divider()
+    
+    # Qualité de service
+    df_qualite = pd.DataFrame(metrics.get("qualite_service", []))
+    if not df_qualite.empty:
+        st.subheader("✨ Qualité de Service")
+        
+        if "qualite" in df_qualite.columns or "score" in df_qualite.columns:
+            quality_col = "qualite" if "qualite" in df_qualite.columns else "score"
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if pd.api.types.is_numeric_dtype(df_qualite[quality_col]):
+                    avg_quality = df_qualite[quality_col].mean()
+                    st.metric("Score Moyen de Qualité", f"{avg_quality:.1f}%")
+            
+            with col2:
+                if "service" in df_qualite.columns:
+                    st.metric("Services Évalués", len(df_qualite))
+            
+            # Graphique
+            if "service" in df_qualite.columns or "ligne" in df_qualite.columns:
+                service_col = "service" if "service" in df_qualite.columns else "ligne"
+                
+                fig = px.bar(
+                    df_qualite.head(15),
+                    x=service_col,
+                    y=quality_col,
+                    title="Qualité de Service par Ligne/Service",
+                    color=quality_col,
+                    color_continuous_scale="RdYlGn"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with st.expander("📊 Détails"):
+                st.dataframe(df_qualite, use_container_width=True)
 
 # ============================================================================
-# TAB 3: CORRÉLATIONS
+# TAB 4: CORRÉLATIONS
 # ============================================================================
 
-with tab3:
+with tab4:
     st.header("🔗 Analyse des Corrélations")
     
     if not correlations_data or not correlations_data.get("correlations"):
@@ -463,10 +963,10 @@ with tab3:
             st.divider()
 
 # ============================================================================
-# TAB 4: RAPPORTS
+# TAB 5: RAPPORTS
 # ============================================================================
 
-with tab4:
+with tab5:
     st.header("📄 Rapports Quotidiens")
     
     if not reports_data or not reports_data.get("reports"):
