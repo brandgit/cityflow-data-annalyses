@@ -109,6 +109,11 @@ def calculate_dmja(df: pd.DataFrame) -> pd.DataFrame:
         .reset_index()
         .rename(columns={"debit_journalier": "dmja"})
     )
+
+    if "latitude" in df.columns and "longitude" in df.columns:
+        coords = df[["compteur_id", "latitude", "longitude"]].drop_duplicates("compteur_id")
+        result = result.merge(coords, on="compteur_id", how="left")
+
     return result
 
 
@@ -689,4 +694,4 @@ def calculate_all_metrics(
     if df_qualite is not None and not df_qualite.empty:
         metrics["qualite_service"] = calculate_qualite_service_aggregate(df_qualite)
     
-    return metri
+    return metrics
