@@ -325,13 +325,15 @@ def _calculate_cityflow_metrics(
     chantiers_df = batch_results.get("chantiers").dataframe if batch_results.get("chantiers") else pd.DataFrame()
     qualite_df = batch_results.get("qualite_service").dataframe if batch_results.get("qualite_service") else pd.DataFrame()
     geo_df = batch_results.get("referentiel_troncons").dataframe if batch_results.get("referentiel_troncons") else pd.DataFrame()
+    bikes_df = api_results.get("bikes").dataframe if api_results.get("bikes") else pd.DataFrame()
     
     # Calculer toutes les métriques
     cityflow_metrics = metrics.calculate_all_metrics(
         df_comptage_velo=comptage_df,
         df_chantiers=chantiers_df,
         df_qualite=qualite_df,
-        df_geo=geo_df
+        df_geo=geo_df,
+        df_bikes=bikes_df
     )
     
     print(f"   ✓ {len(cityflow_metrics)} métriques CityFlow calculées")

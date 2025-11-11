@@ -5,9 +5,118 @@ Implémente toutes les métriques définies dans METRIQUES_ET_CAS_USAGE.md
 
 from __future__ import annotations
 
-from typing import Dict, List, Any
+import json
+from typing import Dict, List, Any, Optional
 import pandas as pd
 import numpy as np
+
+
+def _extract_coordinates_from_bikes(df_bikes: Optional[pd.DataFrame]) -> pd.DataFrame:
+    """
+    Extrait un mapping compteur_id → (latitude, longitude) à partir du flux API bikes.
+    """
+    if df_bikes is None or df_bikes.empty:
+        return pd.DataFrame(columns=["compteur_id", "latitude", "longitude"])
+
+    df = df_bikes.copy()
+
+    id_col: Optional[str] = None
+    for candidate in ["id_compteur", "compteur_id", "id"]:
+        if candidate in df.columns:
+            id_col = candidate
+            break
+    if id_col is None:
+        return pd.DataFrame(columns=["compteur_id", "latitude", "longitude"])
+
+    lat_col: Optional[str] = None
+    lon_col: Optional[str] = None
+    for candidate in ["coordinates.lat", "latitude", "lat"]:
+        if candidate in df.columns:
+            lat_col = candidate
+            break
+    for candidate in ["coordinates.lon", "longitude", "lon"]:
+        if candidate in df.columns:
+            lon_col = candidate
+            break
+
+    if lat_col is not None and lon_col is not None:
+        coord_df = df[[id_col, lat_col, lon_col]].copy()
+    elif "coordinates" in df.columns:
+        coords = df["coordinates"]
+
+        def _safe_parse(value: Any) -> tuple[Optional[float], Optional[float]]:
+            if isinstance(value, dict):
+                lat = value.get("lat") or value.get("latitude")
+                lon = value.get("lon") or value.get("lng") or value.get("longitude")
+            elif isinstance(value, str):
+                try:
+                    parsed = json.loads(value)
+                except json.JSONDecodeError:
+                    return None, None
+                lat = parsed.get("lat") or parsed.get("latitude")
+                lon = parsed.get("lon") or parsed.get("lng") or parsed.get("longitude")
+            else:
+                return None, None
+            try:
+                return float(lat), float(lon)
+            except (TypeError, ValueError):
+                return None, None
+
+        latitudes: List[Optional[float]] = []
+        longitudes: List[Optional[float]] = []
+        for value in coords:
+            lat, lon = _safe_parse(value)
+            latitudes.append(lat)
+            longitudes.append(lon)
+
+        coord_df = pd.DataFrame(
+            {
+                id_col: df[id_col].values,
+                "latitude_tmp": latitudes,
+                "longitude_tmp": longitudes,
+            }
+        )
+        lat_col, lon_col = "latitude_tmp", "longitude_tmp"
+    else:
+        return pd.DataFrame(columns=["compteur_id", "latitude", "longitude"])
+
+    coord_df = coord_df.rename(
+        columns={
+            id_col: "compteur_id",
+            lat_col: "latitude",
+            lon_col: "longitude",
+        }
+    )
+    coord_df = coord_df.dropna(subset=["latitude", "longitude"])
+    coord_df = coord_df.drop_duplicates("compteur_id")
+    return coord_df[["compteur_id", "latitude", "longitude"]]
+
+
+def _enrich_comptage_with_coordinates(
+    df_comptage: pd.DataFrame, df_bikes: Optional[pd.DataFrame]
+) -> pd.DataFrame:
+    """
+    Complète les coordonnées GPS manquantes en se basant sur le flux bikes.
+    """
+    if df_comptage.empty:
+        return df_comptage
+
+    coord_df = _extract_coordinates_from_bikes(df_bikes)
+    if coord_df.empty:
+        return df_comptage
+
+    enriched = df_comptage.merge(coord_df, on="compteur_id", how="left", suffixes=("", "_bike"))
+
+    for coord in ("latitude", "longitude"):
+        bike_col = f"{coord}_bike"
+        if bike_col in enriched.columns:
+            if coord not in enriched.columns:
+                enriched[coord] = enriched[bike_col]
+            else:
+                enriched[coord] = enriched[coord].fillna(enriched[bike_col])
+            enriched = enriched.drop(columns=[bike_col])
+
+    return enriched
 
 
 # ============================================================================
@@ -643,7 +752,8 @@ def calculate_all_metrics(
     df_comptage_velo: pd.DataFrame,
     df_chantiers: pd.DataFrame = None,
     df_qualite: pd.DataFrame = None,
-    df_geo: pd.DataFrame = None
+    df_geo: pd.DataFrame = None,
+    df_bikes: pd.DataFrame = None,
 ) -> Dict[str, Any]:
     """
     Calcule TOUTES les métriques CityFlow Analytics.
@@ -658,6 +768,9 @@ def calculate_all_metrics(
         Dictionnaire contenant toutes les métriques calculées
     """
     metrics = {}
+    
+    df_comptage_velo = df_comptage_velo.copy()
+    df_comptage_velo = _enrich_comptage_with_coordinates(df_comptage_velo, df_bikes)
     
     # 1. Métriques de flux
     metrics["debit_horaire"] = calculate_debit_horaire(df_comptage_velo)
