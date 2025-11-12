@@ -25,7 +25,7 @@ st.set_page_config(
 # Configuration de l'URL de l'API
 # En production sur EC2, utiliser l'IP publique
 # En local, utiliser localhost
-API_URL = os.getenv("API_URL", "http://35.180.67.164:8000")
+API_URL = os.getenv("API_URL", "http://51.44.214.181:8000")
 
 # CSS personnalisé
 st.markdown("""
