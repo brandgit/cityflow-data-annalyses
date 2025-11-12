@@ -32,6 +32,8 @@ class Config:
         self.use_s3 = os.getenv("USE_S3", "false").lower() == "true"
         self.s3_raw_bucket = os.getenv("S3_RAW_BUCKET", "bucket-cityflow-paris-s3-raw")
         self.s3_raw_prefix = os.getenv("S3_RAW_PREFIX", "raw")
+        self.s3_output_bucket = os.getenv("S3_OUTPUT_BUCKET", self.s3_raw_bucket)
+        self.s3_reports_prefix = os.getenv("S3_REPORTS_PREFIX", "rapports")
         
         # Configuration Local
         self.local_raw = os.getenv("LOCAL_RAW", "bucket-cityflow-paris-s3-raw")

@@ -131,6 +131,7 @@ class OutputWriter:
         self.config = get_config()
         self._mongo_client = None
         self._dynamo_resource = None
+        self._s3_client = None
     
     def write_metrics(self, date: str, metrics: Dict[str, Any]) -> bool:
         """
@@ -273,6 +274,14 @@ class OutputWriter:
             
             if success:
                 success_count += 1
+            
+            if self.config.is_aws:
+                s3_uploaded = self._upload_report_csv_to_s3(date, report_type, report_data)
+                if s3_uploaded:
+                    print(
+                        f"         ↳ Rapport exporté vers s3://{self.config.s3_output_bucket}/"
+                        f"{self.config.s3_reports_prefix}/{date}/{self._sanitize_report_name(report_type)}.csv"
+                    )
         
         print(f"      → {success_count}/{total_count} rapports sauvegardés")
         return success_count > 0
@@ -334,6 +343,74 @@ class OutputWriter:
             return [self._convert_floats_to_decimal(item) for item in obj]
         else:
             return obj
+    
+    def _upload_report_csv_to_s3(self, date: str, report_type: str, report_data: Any) -> bool:
+        """Exporte un rapport au format CSV dans S3."""
+        if not self.config.is_aws:
+            return False
+        
+        try:
+            import boto3
+            import pandas as pd
+            
+            if self._s3_client is None:
+                self._s3_client = boto3.client("s3", region_name=self.config.aws_region)
+            
+            df = self._report_to_dataframe(report_data)
+            if df is None:
+                return False
+            
+            csv_buffer = df.to_csv(index=False)
+            key = (
+                f"{self.config.s3_reports_prefix}/{date}/"
+                f"{self._sanitize_report_name(report_type)}.csv"
+            )
+            
+            self._s3_client.put_object(
+                Bucket=self.config.s3_output_bucket,
+                Key=key,
+                Body=csv_buffer.encode("utf-8")
+            )
+            return True
+        except Exception as exc:
+            print(f"⚠️  Export S3 rapport '{report_type}' échoué: {exc}")
+            return False
+    
+    def _report_to_dataframe(self, report_data: Any):
+        """Convertit un rapport (dict/list/DataFrame) en DataFrame."""
+        import pandas as pd
+        
+        if report_data is None:
+            return None
+        
+        if isinstance(report_data, pd.DataFrame):
+            return report_data
+        
+        if isinstance(report_data, list):
+            if not report_data:
+                return pd.DataFrame()
+            if all(isinstance(row, dict) for row in report_data):
+                return pd.DataFrame(report_data)
+            return pd.DataFrame({"valeur": report_data})
+        
+        if isinstance(report_data, dict):
+            try:
+                normalized = pd.json_normalize(report_data)
+                if not normalized.empty:
+                    return normalized
+            except Exception:
+                pass
+            return pd.DataFrame(
+                [{"cle": key, "valeur": value} for key, value in report_data.items()]
+            )
+        
+        return pd.DataFrame([{"valeur": report_data}])
+    
+    @staticmethod
+    def _sanitize_report_name(report_type: str) -> str:
+        """Nettoie le nom du rapport pour une utilisation dans un chemin S3."""
+        safe = report_type.replace(" ", "_").replace("/", "_")
+        return "".join(ch for ch in safe if ch.isalnum() or ch in ("_", "-")).lower()
     
     def close(self):
         """Ferme les connexions."""

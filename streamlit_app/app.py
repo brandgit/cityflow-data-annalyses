@@ -284,7 +284,7 @@ with tab1:
                 x=value_col,
                 orientation="h",
                 title=f"Top 20 Compteurs par {value_col.upper()}",
-                labels={value_col: value_col.replace("_", " ").title(), "compteur_id": "Compteur"},
+                labels={value_col: f"{value_col.upper()}/j", "compteur_id": "Compteur"},
                 color=value_col,
                 color_continuous_scale="Viridis",
                 height=600
