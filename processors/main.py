@@ -161,6 +161,12 @@ def _materialise_outputs(output_root: Path | None, date: str, outputs: DailyProc
         metrics_for_db = {}
         for metric_name, metric_data in outputs.metrics_cityflow.items():
             if isinstance(metric_data, pd.DataFrame) and not metric_data.empty:
+                if metric_name == "top_compteurs":
+                    print("🔎 DEBUG top_compteurs columns:", list(metric_data.columns))
+                    print(
+                        "🔎 DEBUG top_compteurs sample:",
+                        metric_data.head(3).to_dict(orient="records"),
+                    )
                 metrics_for_db[metric_name] = json.loads(metric_data.to_json(orient="records"))
         
         # Sauvegarder les métriques
