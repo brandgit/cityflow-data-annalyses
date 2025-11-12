@@ -529,13 +529,28 @@ if __name__ == "__main__":
     
     print("\n📅 Détermination de la date de traitement...")
     today = pd.Timestamp.utcnow().strftime("%Y-%m-%d")
+    requested_date = None
+    if len(sys.argv) > 1 and sys.argv[1]:
+        requested_date = sys.argv[1]
+    elif os.getenv("PROCESSING_DATE"):
+        requested_date = os.getenv("PROCESSING_DATE")
+    
+    if requested_date:
+        print(f"   • Date demandée: {requested_date}")
     
     # En mode AWS, ne pas sauvegarder localement (manque d'espace disque)
     output_root = Path("output") if cfg.is_local else None
 
-    target_date = _resolve_processing_date(raw_root, today)
-    if target_date != today:
-        print(f"   ⚠ Aucune donnée pour {today}, traitement de la dernière date disponible {target_date}.")
+    base_date = requested_date or today
+    target_date = _resolve_processing_date(raw_root, base_date)
+    if target_date != base_date:
+        if requested_date:
+            print(
+                f"   ⚠ Données introuvables pour {requested_date}, utilisation de la dernière date "
+                f"disponible {target_date}."
+            )
+        else:
+            print(f"   ⚠ Aucune donnée pour {today}, traitement de la dernière date disponible {target_date}.")
     else:
         print(f"   ✓ Date de traitement: {target_date}")
 

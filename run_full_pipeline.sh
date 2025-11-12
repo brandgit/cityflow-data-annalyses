@@ -56,9 +56,16 @@ echo "╚═══════════════════════�
 echo ""
 
 echo "🔄 Lancement du traitement des données (processors)..."
+if [ -n "$1" ]; then
+    echo "   → Date renseignée : $1"
+fi
 echo ""
 
-python -m processors.main 2>&1
+if [ -n "$1" ]; then
+    python -m processors.main "$1" 2>&1
+else
+    python -m processors.main 2>&1
+fi
 
 PROCESSOR_EXIT_CODE=$?
 
