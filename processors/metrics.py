@@ -442,7 +442,30 @@ def calculate_top_compteurs(df: pd.DataFrame, top_n: int = 200) -> pd.DataFrame:
             "🔎 DEBUG calculate_top_compteurs merge coords sample:",
             coords.head(3).to_dict(orient="records"),
         )
-        top = top.merge(coords, on="compteur_id", how="left")
+        top = top.merge(coords, on="compteur_id", how="left", suffixes=("", "_ref"))
+
+    # Harmoniser les colonnes de coordonnées (latitude*, longitude*)
+    lat_cols = [col for col in top.columns if col.startswith("latitude")]
+    if lat_cols:
+        top["latitude"] = (
+            top[lat_cols]
+            .bfill(axis=1)
+            .iloc[:, 0]
+        )
+        drop_lat = [col for col in lat_cols if col != "latitude"]
+        if drop_lat:
+            top = top.drop(columns=drop_lat)
+
+    lon_cols = [col for col in top.columns if col.startswith("longitude")]
+    if lon_cols:
+        top["longitude"] = (
+            top[lon_cols]
+            .bfill(axis=1)
+            .iloc[:, 0]
+        )
+        drop_lon = [col for col in lon_cols if col != "longitude"]
+        if drop_lon:
+            top = top.drop(columns=drop_lon)
 
     base_cols = ["rang", "compteur_id", "dmja"]
     optional_cols = [col for col in ["latitude", "longitude"] if col in top.columns]
