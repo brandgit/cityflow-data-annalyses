@@ -265,6 +265,14 @@ with tab1:
     df_top = safe_dataframe(metrics.get("top_compteurs", []))
     if not df_top.empty:
         st.subheader("🏆 Top 20 Compteurs les Plus Actifs")
+        st.markdown(
+            """
+            *Lecture rapide* :
+            - **DMJA** = moyenne des passages quotidiens sur l’année ; plus la barre est longue, plus l’axe est fréquenté.
+            - Les identifiants correspondent aux compteurs vélos installés sur le domaine public parisien.
+            - Cette vue aide à repérer les axes prioritaires pour l’entretien et la sécurisation des pistes.
+            """
+        )
         
         # Trouver la colonne de valeur
         value_col = "dmja" if "dmja" in df_top.columns else ("debit_total" if "debit_total" in df_top.columns else "debit_moyen")
@@ -292,6 +300,14 @@ with tab1:
     df_heures = safe_dataframe(metrics.get("heures_pointe", []))
     if not df_heures.empty and "heure" in df_heures.columns:
         st.subheader("⏰ Profil Horaire du Trafic")
+        st.markdown(
+            """
+            *À retenir* :
+            - Les pointes du matin et du soir correspondent aux trajets domicile ↔ travail.
+            - Le creux de milieu de journée reflète la baisse d’affluence hors heures de pointe.
+            - Utilisez cette courbe pour caler la régulation (services Vélib’, interventions techniques, communication).
+            """
+        )
         
         value_col = None
         for col in ["debit_moyen", "debit_total", "comptage"]:
@@ -326,6 +342,14 @@ with tab1:
     df_debit = safe_dataframe(metrics.get("debit_journalier", []))
     if not df_debit.empty and "compteur_id" in df_debit.columns and "debit_journalier" in df_debit.columns:
         st.subheader("📅 Débit Journalier par Compteur")
+        st.markdown(
+            """
+            *Comment lire la heatmap* :
+            - Chaque ligne = un compteur du top 15 ; chaque colonne = un jour.
+            - **Vert** = volume élevé, **rouge** = volume faible.
+            - Les variations soudaines (taches rouges) aident à détecter des incidents, travaux ou conditions météo défavorables.
+            """
+        )
         
         # Top 15 compteurs
         top_15 = df_debit.groupby("compteur_id")["debit_journalier"].sum().nlargest(15).index
@@ -368,6 +392,14 @@ with tab1:
     df_densite = safe_dataframe(metrics.get("densite_par_zone", []))
     if not df_densite.empty:
         st.subheader("🗺️ Répartition Géographique")
+        st.markdown(
+            """
+            *Objectif* :
+            - Comparer la part de trafic par arrondissement / zone.
+            - Le camembert met en évidence les zones dominantes ; l’histogramme détaille le top 15.
+            - Utile pour équilibrer les efforts d’aménagement entre centre et périphérie.
+            """
+        )
         
         # Trouver les colonnes
         value_col = None
@@ -410,6 +442,14 @@ with tab1:
     
     # CARTOGRAPHIE
     st.subheader("🗺️ Cartographie Interactive - Compteurs Vélo Paris")
+    st.markdown(
+        """
+        *Conseils de lecture* :
+        - Chaque point représente un compteur ; la couleur et la taille sont proportionnelles au trafic observé.
+        - Zoomez / changez de mode (3D, 2D, heatmap) pour explorer les couloirs très fréquentés ou vérifier l’équilibre centre ↔ périphérie.
+        - Combinez cette carte avec la heatmap pour identifier les zones régulières vs. celles sujettes aux coupures.
+        """
+    )
     
     # Essayer de récupérer les données avec coordonnées
     df_map = None
@@ -575,6 +615,14 @@ with tab2:
     df_debit = safe_dataframe(metrics.get("debit_journalier", []))
     if not df_debit.empty:
         st.subheader("📅 Débit Journalier par Compteur")
+        st.markdown(
+            """
+            *Ce que montre ce graphique* :
+            - Suivi jour par jour des passages sur chaque compteur.
+            - Les zones rouges/vertes aident à repérer des anomalies ou des pics exceptionnels.
+            - Pratique pour voir l'impact d'un événement (travaux, météo) sur la fréquentation.
+            """
+        )
         
         col1, col2, col3 = st.columns(3)
         
@@ -636,6 +684,14 @@ with tab2:
     df_dmja = safe_dataframe(metrics.get("dmja", []))
     if not df_dmja.empty:
         st.subheader("📈 DMJA (Débit Moyen Journalier Annuel)")
+        st.markdown(
+            """
+            *Lecture rapide* :
+            - Le **DMJA** représente la moyenne quotidienne de passages sur l'année.
+            - Permet de classer les axes selon leur fréquentation structurelle (hors saisonnalité ponctuelle).
+            - Servez-vous-en pour prioriser les investissements sur les corridors les plus demandés.
+            """
+        )
         
         if "dmja" in df_dmja.columns and "compteur_id" in df_dmja.columns:
             top_15 = df_dmja.nlargest(15, "dmja")
@@ -662,6 +718,13 @@ with tab2:
         df_defaillants = safe_dataframe(metrics.get("compteurs_defaillants", []))
         if not df_defaillants.empty:
             st.subheader("⚠️ Compteurs Défaillants")
+            st.markdown(
+                """
+                *À surveiller* :
+                - Compteurs sans données pendant une longue période (défaut matériel, coupure réseau).
+                - Permet de prioriser les tournées de maintenance.
+                """
+            )
             st.metric("Nombre", len(df_defaillants))
             with st.expander("Voir la liste"):
                 st.dataframe(df_defaillants, use_container_width=True)
@@ -672,6 +735,13 @@ with tab2:
         df_faible = safe_dataframe(metrics.get("compteurs_faible_activite", []))
         if not df_faible.empty:
             st.subheader("📉 Faible Activité")
+            st.markdown(
+                """
+                *Interprétation* :
+                - Compteurs largement en dessous de la médiane (baisse de fréquentation ou défaut capteur).
+                - Aide à distinguer une tendance de fond d’un simple incident technique.
+                """
+            )
             st.metric("Nombre", len(df_faible))
             with st.expander("Voir la liste"):
                 st.dataframe(df_faible, use_container_width=True)
@@ -684,6 +754,14 @@ with tab2:
     df_ratio = safe_dataframe(metrics.get("ratio_weekend_semaine", []))
     if not df_ratio.empty:
         st.subheader("📅 Ratio Weekend / Semaine")
+        st.markdown(
+            """
+            *Comprendre le ratio* :
+            - > 1 : trafic plus fort le week-end (loisirs/tourisme).
+            - < 1 : trafic principalement en semaine (trajets domicile ↔ travail).
+            - Utile pour ajuster les messages ou services ciblés (événements, communication).
+            """
+        )
         
         required_cols = {"debit_weekend", "debit_semaine", "ratio_weekend_semaine", "difference_pct"}
         if required_cols.issubset(df_ratio.columns):
@@ -716,6 +794,13 @@ with tab2:
     df_horaire = safe_dataframe(metrics.get("debit_horaire", []))
     if not df_horaire.empty:
         st.subheader("⏱️ Débit Horaire Détaillé")
+        st.markdown(
+            """
+            *À quoi ça sert ?* :
+            - Compare les compteurs selon leur charge horaire moyenne.
+            - Permet d’identifier les tronçons proches de la saturation ou très volatiles.
+            """
+        )
         
         horaire_cols = {"compteur_id", "debit_horaire_moyen", "debit_horaire_median", "debit_horaire_max"}
         if horaire_cols.issubset(df_horaire.columns):
@@ -744,6 +829,13 @@ with tab2:
     df_profil = safe_dataframe(metrics.get("profil_jour_type", []))
     if not df_profil.empty:
         st.subheader("📅 Profil Jour Type")
+        st.markdown(
+            """
+            *Lecture* :
+            - Heatmap = intensité par jour de la semaine / heure de la journée.
+            - Permet de visualiser les périodes à forte affluence pour planifier la régulation ou la communication.
+            """
+        )
         
         if {"jour", "heure"}.issubset(df_profil.columns):
             value_col = "debit_moyen" if "debit_moyen" in df_profil.columns else None
@@ -782,6 +874,13 @@ with tab2:
     df_dispo = safe_dataframe(metrics.get("taux_disponibilite", []))
     if not df_dispo.empty:
         st.subheader("✅ Taux de Disponibilité des Compteurs")
+        st.markdown(
+            """
+            *Pourquoi regarder ce KPI* :
+            - Mesure la fiabilité des compteurs (taux de temps où ils émettent des données).
+            - Un taux faible doit déclencher une intervention pour éviter les trous dans l’analyse.
+            """
+        )
         
         col_name = "taux_disponibilite_pct" if "taux_disponibilite_pct" in df_dispo.columns else "taux_disponibilite"
         if col_name in df_dispo.columns:
@@ -812,6 +911,13 @@ with tab2:
     df_corridors = safe_dataframe(metrics.get("corridors_cyclables", []))
     if not df_corridors.empty:
         st.subheader("🚲 Corridors Cyclables Principaux")
+        st.markdown(
+            """
+            *Utilisation* :
+            - Liste les axes les plus empruntés (DMJA élevé).
+            - Aide à prioriser les actions de sécurisation, signalétique ou extension d’infrastructures.
+            """
+        )
         
         if {"dmja", "compteur_id"}.issubset(df_corridors.columns):
             top_corridors = df_corridors.nlargest(15, "dmja")
@@ -850,6 +956,13 @@ with tab2:
     df_hebdo = safe_dataframe(metrics.get("evolution_hebdomadaire", []))
     if not df_hebdo.empty:
         st.subheader("📈 Évolution Hebdomadaire")
+        st.markdown(
+            """
+            *Message clé* :
+            - Suivi du volume total semaine par semaine.
+            - Les barres bleues indiquent la croissance (%) pour repérer hausses ou baisses durables.
+            """
+        )
         
         if {"periode", "debit_total"}.issubset(df_hebdo.columns):
             fig = make_subplots(specs=[[{"secondary_y": True}]])
@@ -898,6 +1011,14 @@ with tab3:
     df_anomalies = safe_dataframe(metrics.get("anomalies", []))
     if not df_anomalies.empty:
         st.subheader("🔍 Anomalies Détectées")
+        st.markdown(
+            """
+            *Ce que signifie une anomalie* :
+            - Variation statistiquement inhabituelle (z-score élevé).
+            - Peut traduire un événement exceptionnel, une panne partielle ou un afflux ponctuel.
+            - Examinez les 10 plus forts z-scores pour prioriser les vérifications.
+            """
+        )
         
         col1, col2 = st.columns(2)
         
@@ -939,6 +1060,13 @@ with tab3:
     df_congestion = safe_dataframe(metrics.get("congestion_cyclable", []))
     if not df_congestion.empty:
         st.subheader("🔴 Zones de Congestion")
+        st.markdown(
+            """
+            *Lecture* :
+            - Met en évidence les segments où le flux dépasse largement la moyenne (risque de saturation).
+            - Utile pour déclencher une veille terrain ou ajuster la signalisation temporaire.
+            """
+        )
         
         col1, col2 = st.columns(2)
         
@@ -975,6 +1103,13 @@ with tab3:
     df_chantiers = safe_dataframe(metrics.get("chantiers_actifs", []))
     if not df_chantiers.empty:
         st.subheader("🚧 Chantiers Actifs")
+        st.markdown(
+            """
+            *Objectif* :
+            - Liste les chantiers en cours impactant potentiellement la circulation vélo.
+            - Permet d’identifier les arrondissements les plus touchés et d’ajuster la communication terrain.
+            """
+        )
         
         col1, col2 = st.columns(2)
         
@@ -1008,6 +1143,13 @@ with tab3:
     df_criticite = safe_dataframe(metrics.get("score_criticite_chantiers", []))
     if not df_criticite.empty:
         st.subheader("⚠️ Criticité des Chantiers")
+        st.markdown(
+            """
+            *Interprétation* :
+            - Score basé sur le nombre de chantiers en chaussée et la surface impactée.
+            - Les valeurs élevées doivent déclencher une coordination renforcée avec les services travaux / circulation.
+            """
+        )
         
         if "score_criticite" in df_criticite.columns:
             col1, col2, col3 = st.columns(3)
@@ -1046,6 +1188,13 @@ with tab3:
     df_qualite = safe_dataframe(metrics.get("qualite_service", []))
     if not df_qualite.empty:
         st.subheader("✨ Qualité de Service")
+        st.markdown(
+            """
+            *Ce que mesure cet indicateur* :
+            - Agrège les scores qualité (transport, exploitants…) fournis par les opérateurs.
+            - Permet de détecter les lignes/services en dessous des attentes et de suivre l’évolution des pénalités éventuelles.
+            """
+        )
         
         if "qualite" in df_qualite.columns or "score" in df_qualite.columns:
             quality_col = "qualite" if "qualite" in df_qualite.columns else "score"
@@ -1084,6 +1233,13 @@ with tab3:
 
 with tab4:
     st.header("🔗 Analyse des Corrélations")
+    st.markdown(
+        """
+        *Pourquoi c’est utile* :
+        - Les corrélations quantifient la relation entre les flux vélo et d’autres facteurs (chantiers, météo, validations transports…).
+        - Chaque section détaille la force du lien et l’évolution conjointe des métriques.
+        """
+    )
     
     if not correlations_data or not correlations_data.get("correlations"):
         st.info("Aucune corrélation disponible pour cette date")
@@ -1093,6 +1249,29 @@ with tab4:
             corr_data = corr_item.get("data", [])
             
             st.subheader(f"🔗 {corr_name.replace('_', ' ').title()}")
+            explanations = {
+                "chantiers_velo": """
+                    *Lecture* :
+                    - Mesure comment les chantiers influent sur la fréquentation vélo.
+                    - Compare les volumes de passages avec le nombre de chantiers actifs.
+                    """,
+                "meteo_velo": """
+                    *Lecture* :
+                    - Analyse l’effet de la météo (température, pluie) sur le trafic vélo.
+                    - Permet d’anticiper les variations saisonnières ou les journées à risque.
+                    """,
+                "qualite_validations": """
+                    *Lecture* :
+                    - Croise les scores de qualité de service avec les validations billettiques (transports).
+                    - Utile pour voir si une amélioration/dégradation de la qualité se traduit par un changement d’usage.
+                    """,
+            }
+            generic_explanation = """
+                *Lecture* :
+                - Coefficient de corrélation proche de 1 : relation positive forte ; proche de -1 : relation inverse.
+                - Aide à vérifier les liens entre le trafic vélo et d’autres facteurs (événements, météo, qualité…).
+                """
+            st.markdown(explanations.get(corr_name, generic_explanation))
             
             if isinstance(corr_data, list) and len(corr_data) > 0:
                 df_corr = safe_dataframe(corr_data)
@@ -1252,6 +1431,13 @@ with tab4:
 
 with tab5:
     st.header("📄 Rapports Quotidiens")
+    st.markdown(
+        """
+        *Contenu des rapports* :
+        - Synthèse automatique des métriques calculées (qualité, volumes, alertes).
+        - Utilisez ces blocs pour extraire rapidement des chiffres clés lors d’une présentation ou d’un reporting.
+        """
+    )
     
     if not reports_data or not reports_data.get("reports"):
         st.info("Aucun rapport disponible")
