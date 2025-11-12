@@ -158,6 +158,11 @@ def _enrich_comptage_with_coordinates(
                 enriched = enriched.drop(columns=[ref_col])
 
     enriched = _assign_fallback_coordinates(enriched)
+    missing_after = enriched["latitude"].isna().sum() if "latitude" in enriched.columns else len(enriched)
+    print(
+        f"🔎 DEBUG enrich: columns={list(enriched.columns)[:10]}, "
+        f"missing_coords_after={missing_after}, sample={enriched[['compteur_id','latitude','longitude']].head(3).to_dict(orient='records')}"
+    )
 
     return enriched
 
@@ -201,6 +206,10 @@ def _assign_fallback_coordinates(df: pd.DataFrame) -> pd.DataFrame:
 
     frame.loc[mask_missing, "latitude"] = fallback_lats
     frame.loc[mask_missing, "longitude"] = fallback_lons
+    print(
+        f"🔎 DEBUG fallback assigned for {mask_missing.sum()} compteurs: "
+        f"{frame.loc[mask_missing, ['compteur_id', 'latitude', 'longitude']].head(3).to_dict(orient='records')}"
+    )
 
     return frame
 
@@ -429,10 +438,20 @@ def calculate_top_compteurs(df: pd.DataFrame, top_n: int = 200) -> pd.DataFrame:
 
     if coord_sources:
         coords = pd.concat(coord_sources, ignore_index=True).drop_duplicates("compteur_id")
+        print(
+            "🔎 DEBUG calculate_top_compteurs merge coords sample:",
+            coords.head(3).to_dict(orient="records"),
+        )
         top = top.merge(coords, on="compteur_id", how="left")
 
     base_cols = ["rang", "compteur_id", "dmja"]
     optional_cols = [col for col in ["latitude", "longitude"] if col in top.columns]
+    print(
+        "🔎 DEBUG calculate_top_compteurs result columns:",
+        list(top.columns),
+        "sample",
+        top[base_cols + optional_cols].head(3).to_dict(orient="records"),
+    )
     return top[base_cols + optional_cols]
 
 
@@ -864,6 +883,12 @@ def calculate_all_metrics(
     
     df_comptage_velo = df_comptage_velo.copy()
     df_comptage_velo = _enrich_comptage_with_coordinates(df_comptage_velo, df_bikes)
+    print(
+        "🔎 DEBUG after enrich in calculate_all_metrics:",
+        {"columns": list(df_comptage_velo.columns)[:10]},
+        "sample",
+        df_comptage_velo[["compteur_id", "latitude", "longitude"]].head(3).to_dict(orient="records"),
+    )
     
     # 1. Métriques de flux
     metrics["debit_horaire"] = calculate_debit_horaire(df_comptage_velo)
