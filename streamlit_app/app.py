@@ -17,7 +17,7 @@ import os
 # Configuration
 st.set_page_config(
     page_title="CityFlow Analytics",
-    page_icon="🚴",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -25,7 +25,7 @@ st.set_page_config(
 # Configuration de l'URL de l'API
 # En production sur EC2, utiliser l'IP publique
 # En local, utiliser localhost
-API_URL = os.getenv("API_URL", "http://51.44.214.181:8000")
+API_URL = os.getenv("API_URL", "http://15.188.195.178:8000")
 
 # CSS personnalisé
 st.markdown("""
@@ -168,7 +168,7 @@ def safe_dataframe(data) -> pd.DataFrame:
 # HEADER
 # ============================================================================
 
-st.markdown("<h1 class='main-title'>🚴 CityFlow Analytics</h1>", unsafe_allow_html=True)
+st.markdown("<h1 class='main-title'> CityFlow Analytics</h1>", unsafe_allow_html=True)
 st.markdown("<p class='subtitle'>Analyse en temps réel de la mobilité cyclable à Paris</p>", unsafe_allow_html=True)
 
 # ============================================================================
@@ -176,13 +176,13 @@ st.markdown("<p class='subtitle'>Analyse en temps réel de la mobilité cyclable
 # ============================================================================
 
 with st.sidebar:
-    st.title("⚙️ Configuration")
+    st.title(" Configuration")
     
     # API Status
     if check_api():
-        st.success("✅ API connectée")
+        st.success(" API connectée")
     else:
-        st.error("❌ API déconnectée")
+        st.error(" API déconnectée")
         st.stop()
     
     # Sélection de date
@@ -191,7 +191,7 @@ with st.sidebar:
         st.error("Aucune donnée disponible")
         st.stop()
     
-    selected_date = st.selectbox("📅 Date", sorted(dates, reverse=True))
+    selected_date = st.selectbox(" Date", sorted(dates, reverse=True))
     
     st.divider()
     st.caption("CityFlow Analytics v2.0")
@@ -200,7 +200,7 @@ with st.sidebar:
 # CHARGEMENT DES DONNÉES
 # ============================================================================
 
-with st.spinner("📥 Chargement des données..."):
+with st.spinner(" Chargement des données..."):
     all_data = get_all_metrics(selected_date)
     correlations_data = get_correlations(selected_date)
     reports_data = get_reports(selected_date)
@@ -216,28 +216,28 @@ metrics = {m["metric_name"]: m["data"] for m in all_data.get("metrics", [])}
 # KPIS GLOBAUX
 # ============================================================================
 
-st.header("📊 Vue d'Ensemble")
+st.header(" Vue d'Ensemble")
 
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    st.metric("📈 Métriques", f"{len(metrics)}/18")
+    st.metric(" Métriques", f"{len(metrics)}/18")
 
 with col2:
     anomalies = len(metrics.get("anomalies", []))
-    st.metric("🚨 Anomalies", anomalies, delta="alertes" if anomalies > 0 else "Aucune")
+    st.metric(" Anomalies", anomalies, delta="alertes" if anomalies > 0 else "Aucune")
 
 with col3:
     congestions = len(metrics.get("congestion_cyclable", []))
-    st.metric("🔴 Congestions", congestions, delta="zones")
+    st.metric(" Congestions", congestions, delta="zones")
 
 with col4:
     df_top = safe_dataframe(metrics.get("top_compteurs", []))
     if not df_top.empty:
         total_compteurs = len(df_top)
-        st.metric("🚴 Compteurs actifs", total_compteurs)
+        st.metric(" Compteurs actifs", total_compteurs)
     else:
-        st.metric("🚴 Compteurs", "N/A")
+        st.metric(" Compteurs", "N/A")
 
 st.divider()
 
@@ -246,12 +246,12 @@ st.divider()
 # ============================================================================
 
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-    "📊 Vue d'Ensemble",
-    "🚴 Flux Vélos", 
-    "🚨 Alertes & Anomalies",
-    "🔗 Corrélations",
-    "📄 Rapports",
-    "🔍 API Explorer"
+    " Vue d'Ensemble",
+    " Flux Vélos", 
+    " Alertes & Anomalies",
+    " Corrélations",
+    " Rapports",
+    " API Explorer"
 ])
 
 # ============================================================================
@@ -259,12 +259,12 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
 # ============================================================================
 
 with tab1:
-    st.header("📊 Vue d'Ensemble Globale")
+    st.header(" Vue d'Ensemble Globale")
     
     # Top Compteurs résumé
     df_top = safe_dataframe(metrics.get("top_compteurs", []))
     if not df_top.empty:
-        st.subheader("🏆 Top 20 Compteurs les Plus Actifs")
+        st.subheader(" Top 20 Compteurs les Plus Actifs")
         st.markdown(
             """
             *Lecture rapide* :
@@ -299,7 +299,7 @@ with tab1:
     # Heures de pointe
     df_heures = safe_dataframe(metrics.get("heures_pointe", []))
     if not df_heures.empty and "heure" in df_heures.columns:
-        st.subheader("⏰ Profil Horaire du Trafic")
+        st.subheader(" Profil Horaire du Trafic")
         st.markdown(
             """
             *À retenir* :
@@ -341,7 +341,7 @@ with tab1:
     # Débit journalier (heatmap)
     df_debit = safe_dataframe(metrics.get("debit_journalier", []))
     if not df_debit.empty and "compteur_id" in df_debit.columns and "debit_journalier" in df_debit.columns:
-        st.subheader("📅 Débit Journalier par Compteur")
+        st.subheader(" Débit Journalier par Compteur")
         st.markdown(
             """
             *Comment lire la heatmap* :
@@ -391,7 +391,7 @@ with tab1:
     # Densité par zone
     df_densite = safe_dataframe(metrics.get("densite_par_zone", []))
     if not df_densite.empty:
-        st.subheader("🗺️ Répartition Géographique")
+        st.subheader(" Répartition Géographique")
         st.markdown(
             """
             *Objectif* :
@@ -441,7 +441,7 @@ with tab1:
     st.divider()
     
     # CARTOGRAPHIE
-    st.subheader("🗺️ Cartographie Interactive - Compteurs Vélo Paris")
+    st.subheader(" Cartographie Interactive - Compteurs Vélo Paris")
     st.markdown(
         """
         *Conseils de lecture* :
@@ -575,7 +575,7 @@ with tab1:
                     },
                 )
                 st.pydeck_chart(deck)
-                st.caption(f"ℹ️ {legend}")
+                st.caption(f"Info {legend}")
 
             except Exception:
                 # Fallback Plotly Mapbox
@@ -599,9 +599,9 @@ with tab1:
                 )
                 st.plotly_chart(fig, use_container_width=True)
         else:
-            st.info("📍 Coordonnées GPS disponibles mais sans données de débit")
+            st.info(" Coordonnées GPS disponibles mais sans données de débit")
     else:
-        st.warning("📍 Pas de coordonnées GPS disponibles dans les données")
+        st.warning(" Pas de coordonnées GPS disponibles dans les données")
         st.caption("Les données de compteurs doivent contenir les colonnes 'latitude' et 'longitude'")
 
 # ============================================================================
@@ -609,12 +609,12 @@ with tab1:
 # ============================================================================
 
 with tab2:
-    st.header("🚴 Analyse Détaillée des Flux Vélos")
+    st.header(" Analyse Détaillée des Flux Vélos")
     
     # Débit journalier détaillé
     df_debit = safe_dataframe(metrics.get("debit_journalier", []))
     if not df_debit.empty:
-        st.subheader("📅 Débit Journalier par Compteur")
+        st.subheader(" Débit Journalier par Compteur")
         st.markdown(
             """
             *Ce que montre ce graphique* :
@@ -675,7 +675,7 @@ with tab2:
                 st.plotly_chart(fig, use_container_width=True)
         
         # Statistiques détaillées
-        with st.expander("📊 Statistiques Détaillées"):
+        with st.expander(" Statistiques Détaillées"):
             st.dataframe(df_debit.describe(), use_container_width=True)
     
     st.divider()
@@ -683,7 +683,7 @@ with tab2:
     # DMJA (Débit Moyen Journalier Annuel)
     df_dmja = safe_dataframe(metrics.get("dmja", []))
     if not df_dmja.empty:
-        st.subheader("📈 DMJA (Débit Moyen Journalier Annuel)")
+        st.subheader(" DMJA (Débit Moyen Journalier Annuel)")
         st.markdown(
             """
             *Lecture rapide* :
@@ -717,7 +717,7 @@ with tab2:
     with col1:
         df_defaillants = safe_dataframe(metrics.get("compteurs_defaillants", []))
         if not df_defaillants.empty:
-            st.subheader("⚠️ Compteurs Défaillants")
+            st.subheader(" Compteurs Défaillants")
             st.markdown(
                 """
                 *À surveiller* :
@@ -729,12 +729,12 @@ with tab2:
             with st.expander("Voir la liste"):
                 st.dataframe(df_defaillants, use_container_width=True)
         else:
-            st.success("✅ Aucun compteur défaillant")
+            st.success(" Aucun compteur défaillant")
     
     with col2:
         df_faible = safe_dataframe(metrics.get("compteurs_faible_activite", []))
         if not df_faible.empty:
-            st.subheader("📉 Faible Activité")
+            st.subheader(" Faible Activité")
             st.markdown(
                 """
                 *Interprétation* :
@@ -746,14 +746,14 @@ with tab2:
             with st.expander("Voir la liste"):
                 st.dataframe(df_faible, use_container_width=True)
         else:
-            st.success("✅ Tous les compteurs sont actifs")
+            st.success(" Tous les compteurs sont actifs")
     
     st.divider()
     
     # Ratio weekend/semaine
     df_ratio = safe_dataframe(metrics.get("ratio_weekend_semaine", []))
     if not df_ratio.empty:
-        st.subheader("📅 Ratio Weekend / Semaine")
+        st.subheader(" Ratio Weekend / Semaine")
         st.markdown(
             """
             *Comprendre le ratio* :
@@ -828,7 +828,7 @@ with tab2:
     # Profil jour type
     df_profil = safe_dataframe(metrics.get("profil_jour_type", []))
     if not df_profil.empty:
-        st.subheader("📅 Profil Jour Type")
+        st.subheader(" Profil Jour Type")
         st.markdown(
             """
             *Lecture* :
@@ -873,7 +873,7 @@ with tab2:
     # Taux de disponibilité
     df_dispo = safe_dataframe(metrics.get("taux_disponibilite", []))
     if not df_dispo.empty:
-        st.subheader("✅ Taux de Disponibilité des Compteurs")
+        st.subheader(" Taux de Disponibilité des Compteurs")
         st.markdown(
             """
             *Pourquoi regarder ce KPI* :
@@ -955,7 +955,7 @@ with tab2:
     # Évolution hebdomadaire
     df_hebdo = safe_dataframe(metrics.get("evolution_hebdomadaire", []))
     if not df_hebdo.empty:
-        st.subheader("📈 Évolution Hebdomadaire")
+        st.subheader(" Évolution Hebdomadaire")
         st.markdown(
             """
             *Message clé* :
@@ -1005,12 +1005,12 @@ with tab2:
 # ============================================================================
 
 with tab3:
-    st.header("🚨 Alertes et Détection d'Anomalies")
+    st.header(" Alertes et Détection d'Anomalies")
     
     # Anomalies
     df_anomalies = safe_dataframe(metrics.get("anomalies", []))
     if not df_anomalies.empty:
-        st.subheader("🔍 Anomalies Détectées")
+        st.subheader(" Anomalies Détectées")
         st.markdown(
             """
             *Ce que signifie une anomalie* :
@@ -1049,17 +1049,17 @@ with tab3:
                 )
                 st.plotly_chart(fig, use_container_width=True)
         
-        with st.expander("📋 Voir toutes les anomalies"):
+        with st.expander(" Voir toutes les anomalies"):
             st.dataframe(df_anomalies, use_container_width=True)
     else:
-        st.success("✅ Aucune anomalie détectée")
+        st.success(" Aucune anomalie détectée")
     
     st.divider()
     
     # Congestions
     df_congestion = safe_dataframe(metrics.get("congestion_cyclable", []))
     if not df_congestion.empty:
-        st.subheader("🔴 Zones de Congestion")
+        st.subheader(" Zones de Congestion")
         st.markdown(
             """
             *Lecture* :
@@ -1092,17 +1092,17 @@ with tab3:
             )
             st.plotly_chart(fig, use_container_width=True)
         
-        with st.expander("📋 Voir toutes les congestions"):
+        with st.expander(" Voir toutes les congestions"):
             st.dataframe(df_congestion, use_container_width=True)
     else:
-        st.success("✅ Aucune congestion détectée")
+        st.success(" Aucune congestion détectée")
     
     st.divider()
     
     # Chantiers actifs
     df_chantiers = safe_dataframe(metrics.get("chantiers_actifs", []))
     if not df_chantiers.empty:
-        st.subheader("🚧 Chantiers Actifs")
+        st.subheader(" Chantiers Actifs")
         st.markdown(
             """
             *Objectif* :
@@ -1134,7 +1134,7 @@ with tab3:
             )
             st.plotly_chart(fig, use_container_width=True)
         
-        with st.expander("📋 Liste des chantiers"):
+        with st.expander(" Liste des chantiers"):
             st.dataframe(df_chantiers, use_container_width=True)
     
     st.divider()
@@ -1142,7 +1142,7 @@ with tab3:
     # Score criticité chantiers
     df_criticite = safe_dataframe(metrics.get("score_criticite_chantiers", []))
     if not df_criticite.empty:
-        st.subheader("⚠️ Criticité des Chantiers")
+        st.subheader(" Criticité des Chantiers")
         st.markdown(
             """
             *Interprétation* :
@@ -1187,7 +1187,7 @@ with tab3:
     # Qualité de service
     df_qualite = safe_dataframe(metrics.get("qualite_service", []))
     if not df_qualite.empty:
-        st.subheader("✨ Qualité de Service")
+        st.subheader(" Qualité de Service")
         st.markdown(
             """
             *Ce que mesure cet indicateur* :
@@ -1224,7 +1224,7 @@ with tab3:
                 )
                 st.plotly_chart(fig, use_container_width=True)
             
-            with st.expander("📊 Détails"):
+            with st.expander(" Détails"):
                 st.dataframe(df_qualite, use_container_width=True)
 
 # ============================================================================
@@ -1232,7 +1232,7 @@ with tab3:
 # ============================================================================
 
 with tab4:
-    st.header("🔗 Analyse des Corrélations")
+    st.header(" Analyse des Corrélations")
     st.markdown(
         """
         *Pourquoi c’est utile* :
@@ -1248,7 +1248,7 @@ with tab4:
             corr_name = corr_item.get("correlation_name", "Inconnue")
             corr_data = corr_item.get("data", [])
             
-            st.subheader(f"🔗 {corr_name.replace('_', ' ').title()}")
+            st.subheader(f" {corr_name.replace('_', ' ').title()}")
             explanations = {
                 "chantiers_velo": """
                     *Lecture* :
@@ -1418,7 +1418,7 @@ with tab4:
                 else:
                     st.info("Pas de structure exploitable pour un graphique. Données brutes affichées ci-dessous.")
 
-                with st.expander("📊 Voir les données brutes"):
+                with st.expander(" Voir les données brutes"):
                     st.dataframe(df_corr, use_container_width=True)
             else:
                 st.info(f"Aucune donnée pour {corr_name}")
@@ -1430,7 +1430,7 @@ with tab4:
 # ============================================================================
 
 with tab5:
-    st.header("📄 Rapports Quotidiens")
+    st.header(" Rapports Quotidiens")
     st.markdown(
         """
         *Contenu des rapports* :
@@ -1449,7 +1449,7 @@ with tab5:
             report_content = report_item.get("report", {})
             timestamp = report_item.get("timestamp", "N/A")
             
-            with st.expander(f"📋 {report_type.replace('_', ' ').title()}", expanded=True):
+            with st.expander(f" {report_type.replace('_', ' ').title()}", expanded=True):
                 st.caption(f"Généré le : {timestamp}")
                 
                 if isinstance(report_content, dict):
@@ -1480,33 +1480,33 @@ with tab5:
 # ============================================================================
 
 with tab6:
-    st.header("🔍 API Explorer")
+    st.header(" API Explorer")
     st.markdown("Explorez tous les endpoints disponibles de l'API CityFlow Analytics")
     
     # Section 1: Informations générales
-    st.subheader("📡 Informations API")
+    st.subheader(" Informations API")
     
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.metric("🌐 URL de l'API", API_URL.replace("http://", "").replace(":8000", ""))
+        st.metric(" URL de l'API", API_URL.replace("http://", "").replace(":8000", ""))
         if check_api():
-            st.success("✅ API Connectée")
+            st.success(" API Connectée")
         else:
-            st.error("❌ API Déconnectée")
+            st.error(" API Déconnectée")
     
     with col2:
         metric_names = get_metric_names()
-        st.metric("📊 Métriques disponibles", len(metric_names))
+        st.metric(" Métriques disponibles", len(metric_names))
     
     with col3:
         dates = get_dates()
-        st.metric("📅 Dates disponibles", len(dates))
+        st.metric(" Dates disponibles", len(dates))
     
     st.divider()
     
     # Section 2: Liste des endpoints
-    st.subheader("🔗 Endpoints Disponibles")
+    st.subheader(" Endpoints Disponibles")
     
     endpoints_data = {
         "Catégorie": [
@@ -1543,7 +1543,7 @@ with tab6:
     st.divider()
     
     # Section 3: Testeur d'endpoint
-    st.subheader("🧪 Testeur d'Endpoint")
+    st.subheader(" Testeur d'Endpoint")
     
     test_col1, test_col2 = st.columns([2, 1])
     
@@ -1563,36 +1563,36 @@ with tab6:
         )
         
         if metric_option == "Toutes les métriques":
-            if st.button("🚀 Tester /metrics/{date}"):
+            if st.button(" Tester /metrics/{date}"):
                 with st.spinner("Chargement..."):
                     result = get_all_metrics(test_date)
                     if result:
-                        st.success(f"✅ {result.get('metrics_count', 0)} métriques trouvées")
+                        st.success(f" {result.get('metrics_count', 0)} métriques trouvées")
                         st.json(result)
                     else:
-                        st.error("❌ Aucune donnée")
+                        st.error(" Aucune donnée")
         else:
             metric_names = get_metric_names()
             selected_metric = st.selectbox("Métrique", metric_names if metric_names else ["debit_journalier"])
             
-            if st.button(f"🚀 Tester /metrics/{test_date}/{selected_metric}"):
+            if st.button(f" Tester /metrics/{test_date}/{selected_metric}"):
                 with st.spinner("Chargement..."):
                     result = get_metric(test_date, selected_metric)
                     if result:
-                        st.success("✅ Métrique trouvée")
+                        st.success(" Métrique trouvée")
                         st.json(result)
                     else:
-                        st.error("❌ Métrique introuvable")
+                        st.error(" Métrique introuvable")
     
     elif endpoint_category == "Corrélations":
-        if st.button(f"🚀 Tester /correlations/{test_date}"):
+        if st.button(f" Tester /correlations/{test_date}"):
             with st.spinner("Chargement..."):
                 result = get_correlations(test_date)
                 if result:
-                    st.success(f"✅ {result.get('correlations_count', 0)} corrélations trouvées")
+                    st.success(f" {result.get('correlations_count', 0)} corrélations trouvées")
                     st.json(result)
                 else:
-                    st.error("❌ Aucune corrélation")
+                    st.error(" Aucune corrélation")
     
     elif endpoint_category == "Rapports":
         report_option = st.radio(
@@ -1601,33 +1601,33 @@ with tab6:
         )
         
         if report_option == "Tous les rapports":
-            if st.button(f"🚀 Tester /reports/{test_date}"):
+            if st.button(f" Tester /reports/{test_date}"):
                 with st.spinner("Chargement..."):
                     result = get_reports(test_date)
                     if result:
-                        st.success(f"✅ {result.get('reports_count', 0)} rapports trouvés")
+                        st.success(f" {result.get('reports_count', 0)} rapports trouvés")
                         st.json(result)
                     else:
-                        st.error("❌ Aucun rapport")
+                        st.error(" Aucun rapport")
         else:
             report_type = st.selectbox(
                 "Type de rapport",
                 ["processing_report", "metrics_summary", "rapport_quotidien"]
             )
             
-            if st.button(f"🚀 Tester /reports/{test_date}?report_type={report_type}"):
+            if st.button(f" Tester /reports/{test_date}?report_type={report_type}"):
                 with st.spinner("Chargement..."):
                     result = get_specific_report(test_date, report_type)
                     if result:
-                        st.success("✅ Rapport trouvé")
+                        st.success(" Rapport trouvé")
                         st.json(result)
                     else:
-                        st.error("❌ Rapport introuvable")
+                        st.error(" Rapport introuvable")
     
     st.divider()
     
     # Section 4: Documentation
-    st.subheader("📚 Documentation")
+    st.subheader(" Documentation")
     st.markdown(f"""
     **Documentation interactive Swagger :**  
     [{API_URL}/docs]({API_URL}/docs)
@@ -1651,7 +1651,7 @@ with tab6:
 st.divider()
 st.markdown("""
 <div style='text-align: center; color: #888; padding: 1rem;'>
-    <p>🚴 <b>CityFlow Analytics Dashboard v2.0</b></p>
+    <p> <b>CityFlow Analytics Dashboard v2.0</b></p>
     <p>Données : DynamoDB | API : FastAPI | Visualisation : Streamlit</p>
 </div>
 """, unsafe_allow_html=True)
